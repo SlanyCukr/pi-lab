@@ -55,7 +55,6 @@ Reviewed 2026-09-23.
 2. The `context7` docs tool went away with the old extension and nothing replaces it; `web_search`/`fetch_content` cover docs lookups.
 3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
 
-4. **G180 backfills on production:** running from the pi-lab session; commands and state in `AGENTS.override.md`.
 
 Closed 2026-09-23: usage check (fine), backup deleted.
 
@@ -234,7 +233,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## History
 
-- 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`, scheduled-run failures handed to cycles (G184); G180 prod backfills (echo24 1264 credits; missing bylines running)
+- 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`, scheduled-run failures handed to cycles (G184); G180 prod backfills done (echo24 codes 1264; missing bylines: 709 credited, 3006 recredited)
 - 2026-10-04 — Pi loop check; auto-continue stops on prices; stale PRs riot-api-project#9, security-money-maker#2 closed; cycles get 45 min past 3 h for a running review; ImageMagick on the Pi
 
 - 2026-09-24 — Lean append (A/B −26 %/task); `/loop` tools hidden; pi-lens style rules off; Guidelines 3.6K → 2.2K
