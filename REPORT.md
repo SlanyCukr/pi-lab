@@ -213,7 +213,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ### Portable kit
 - **`pi-kit` with Copilot for sub-agents** (2026-09-23). Copilot has the same `gpt-5.6-luna`/`gpt-6-astra`, so the swap is placeholders. Docker test: Explore and the advisor route to `github-copilot`; a real Copilot turn needs a GitHub login. GPT-6 Astra needs Copilot Pro+.
-- **pi-lab public on GitHub** (2026-10-05): the only off-machine copy of the setup, and reusable. `.gitignore` keeps out the find-gaps loop (user's choice), eval cases and runs (excerpts of private sessions), the chat-message research file (held a password) and `*.jsonl`; `gitleaks` 8.30 plus a password grep found nothing in the 521 files. `server/setup-root.sh` + `install-user.sh` replace the one-shot move script for the host layer; `server/test/` checks the user side in Debian.
+- **pi-lab public on GitHub** (2026-10-05): the only off-machine copy of the setup, and reusable. `.gitignore` keeps out the find-gaps loop (user's choice), eval cases and runs (excerpts of private sessions), the chat-message research file (held a password) and `*.jsonl`. Host details (URLs, host name, prod paths, loop operations) live in the gitignored `AGENTS.override.md`, which pi loads instead of `AGENTS.md`; the first push still had them, so `main` was rewritten (a deleted-and-recreated repo would also drop the old commit). `gitleaks` 8.30 plus a password grep found nothing in the 521 files. `server/setup-root.sh` + `install-user.sh` replace the one-shot move script for the host layer; `server/test/` checks the user side in Debian.
 - **Left out of the kit**: pi-web, `models.json` (local Gemma), `code-intel.json` (semvex), the skills `.venv` (667 MB), and the project `.env` permission allows.
 
 ### Evaluated and rejected
