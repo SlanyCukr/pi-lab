@@ -61,6 +61,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## How to work here (gotchas)
 
+- Long jobs on production: one process at a time, each in its own `docker compose run --rm --no-deps -T worker …` container, with find-gaps pushes held (`hold-push`). Inside the live worker (512 MiB) three backfills OOM-killed it, and three parallel fetchers made ~35% of the host's new connections fail upstream (0% with one) (2026-10-05).
 
 ### Running pi
 - `pi -p` from a script or background shell needs `< /dev/null`, or it blocks forever.
