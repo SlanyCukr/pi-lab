@@ -1,0 +1,102 @@
+[
+ {
+  "id": "q1-list",
+  "q": "List every Playwright spec file under frontend/e2e that mocks or routes the `/api/outlets/entity-stance` endpoint. Be exhaustive.",
+  "req": [
+   "matrix-folds.spec.ts",
+   "matrix-heights.spec.ts",
+   "matrix-url-state.spec.ts",
+   "taxonomy-labels.spec.ts"
+  ]
+ },
+ {
+  "id": "q2-trace",
+  "q": "When a visitor opens a story page for a story that no longer exists, how does the app produce a 404 page that links to that story's week? Name every participating file and what each does, including how a client-sent copy of the internal header is handled.",
+  "req": [
+   "proxy.ts",
+   "lib/schemas/stories.ts",
+   "not-found.tsx",
+   "x-mm-missing-story-week|MISSING_STORY_WEEK_HEADER",
+   "delete|strip"
+  ]
+ },
+ {
+  "id": "q3-locate",
+  "q": "Where is the formatter defined that prints a non-zero share that rounds to 0 as \"< 1 %\"? How many files (outside the defining file) import it?",
+  "req": [
+   "lib/format.ts",
+   "fmtShare",
+   "\\b38\\b"
+  ]
+ },
+ {
+  "id": "q4-config",
+  "q": "Where does the nightly database backup copy its off-box mirror to, how is that destination configured (variable names and defaults), and what happens to the local backup when the mirror fails?",
+  "req": [
+   "scripts/backup.sh",
+   "MM_BACKUP_REMOTE_HOST",
+   "192.168.1.22",
+   "2223",
+   "retain|kept|keeps|not deleted|remains"
+  ]
+ },
+ {
+  "id": "q5-negative",
+  "q": "Does this project use Redis or any other external cache server anywhere (backend or frontend)? If not, where and how does server-side caching live?",
+  "req": [
+   "\\bno\\b|not use|does not|doesn't|none",
+   "lib/server/cache.ts",
+   "\\bMap\\b"
+  ],
+  "neg": "uses Redis|Redis is used"
+ },
+ {
+  "id": "q6-howdoes",
+  "q": "How are public API requests and login attempts rate limited? Name the module, the data structure that holds the counts, and the HTTP status returned when a caller is over the limit.",
+  "req": [
+   "request-admission.ts",
+   "\\bMap\\b|bucket",
+   "\\b429\\b"
+  ]
+ },
+ {
+  "id": "q7-enumerate",
+  "q": "List every route handler file under frontend/app/api that calls `requireAdmin(` or `requireAdminUser(`. Give the full list and the count.",
+  "req": [
+   "admin/coverage\\-diagnostics/route\\.ts",
+   "admin/expert\\-claims/route\\.ts",
+   "admin/expert\\-connections/route\\.ts",
+   "admin/expert\\-topic\\-fit/route\\.ts",
+   "admin/extraction\\-quality/route\\.ts",
+   "admin/overview/route\\.ts",
+   "admin/pipeline\\-health/route\\.ts",
+   "admin/pipeline\\-history/route\\.ts",
+   "admin/pipeline\\-replays/article/route\\.ts",
+   "admin/pipeline\\-replays/candidates/route\\.ts",
+   "admin/pipeline\\-replays/\\[id\\]/submit/route\\.ts",
+   "admin/pipeline\\-replays/preview/route\\.ts",
+   "admin/pipeline\\-replays/route\\.ts",
+   "authors/route\\.ts",
+   "canonicals/overrides/\\[id\\]/route\\.ts",
+   "canonicals/overrides/route\\.ts",
+   "canonicals/route\\.ts",
+   "chat/threads/route\\.ts",
+   "enrichments/queue\\-status/route\\.ts",
+   "queue\\-health/route\\.ts",
+   "saved\\-queries/\\[id\\]/route\\.ts",
+   "saved\\-queries/route\\.ts"
+  ],
+  "fp": "app/api/[\\w\\-/\\[\\]\\.]+route\\.ts",
+  "count": 22
+ },
+ {
+  "id": "q8-backend",
+  "q": "When the GLM enrichment worker is stopped with SIGTERM during a deploy, how are rows it had claimed but not started handed back to the queue? Name the class, the method and the files involved.",
+  "req": [
+   "glm_scheduling.py",
+   "GlmSchedulingPolicy",
+   "release_unstarted",
+   "_bootstrap.py|SIGTERM"
+  ]
+ }
+]

@@ -1,0 +1,15 @@
+**I would not ship it yet.** Three defects remain, ranked by severity:
+
+1. **High — A completion can start a turn during manual compaction** ([index.ts:147](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:147), lines 158, 204–208).  
+   Run `/compact` while a background job is pending. Manual compaction leaves `agentRunning` false and need not emit `input`; the completion therefore immediately triggers a turn. In installed pi **0.85.1**, `sendCustomMessage()` bypasses the compaction guard in `prompt()`. Compaction can subsequently replace `agent.state.messages` while that new run is active.  
+   **Minimal fix:** retain the extension context and include `!ctx.isIdle()` in the delivery guard. Retry queued deliveries while pi remains busy, including when no agent lifecycle event will follow.
+
+2. **Medium — The advertised stop command bypasses escalation and loses descendant ownership** ([index.ts:286](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:286), lines 266–270).  
+   A shell waits on a worker that ignores SIGTERM. Execute the advertised `kill -- -PGID`: the shell exits, but the worker survives. Because `terminate()` was never called, `job.terminating` is false; `finish()` removes the group and cancels its timeout. Neither shutdown nor the exit fallback subsequently kills that worker. This is externally interrupted work, distinct from descendants deliberately left behind after normal completion.  
+   **Minimal fix:** advertise `kill -KILL -- -PGID` for guaranteed stopping, or preserve ownership and schedule escalation when the leader exits from a signal.
+
+3. **Medium — Background shutdown and timeout silently fail on Windows** ([index.ts:79](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:79), lines 239–244).  
+   Windows does not support POSIX negative-PID group signalling. Both termination attempts fail and are swallowed, allowing commands to survive timeout and session shutdown. Additionally, `getShellConfig()` can return `commandTransport: "stdin"` for legacy WSL bash; this implementation discards it and supplies ignored stdin.  
+   **Minimal fix:** delegate background requests to foreground on Windows until platform-specific spawning and tree termination are implemented.
+
+The synchronous fd closure, spawn-error listener, ownership-checked escalation, shutdown settlement, private log permissions, and UTF-8 continuation-byte skipping otherwise look correct under the stated POSIX assumptions and accepted risks. These findings are from static inspection against installed pi 0.85.1; no files were modified.

@@ -1,0 +1,9 @@
+{
+  "webSearch": {
+    "allowedProviders": ["openai", "exa"]
+  },
+  "tools": {
+    "sourceCheck": { "enabled": false },
+    "getSearchContent": { "enabled": false }
+  }
+}

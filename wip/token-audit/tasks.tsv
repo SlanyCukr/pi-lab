@@ -1,0 +1,7 @@
+explain	why does install.sh back stuff up before copying?	true
+dryrun	add a --dry-run flag to install.sh that prints what it would copy and changes nothing	bash -n install.sh && grep -q -- '--dry-run' install.sh && H=$(mktemp -d) && HOME=$H ./install.sh --dry-run --files-only >/dev/null 2>&1 && test -z "$(ls -A $H)"
+bugfind	export.sh sometimes leaks secrets?? check	true
+todofix	plan and then do it: make install.sh exit with a clear error when rsync is missing, and mention it in the README	bash -n install.sh && grep -q rsync README.md && grep -q 'command -v rsync' install.sh
+web	what's the newest version of @earendil-works/pi-coding-agent on npm, and when was it published? search the web	true
+explore	have an Explore sub-agent find where install.sh substitutes the sub-agent provider, then give me the line	true
+readme	README is out of date vs install.sh flags, fix it	grep -q -- '--files-only' README.md

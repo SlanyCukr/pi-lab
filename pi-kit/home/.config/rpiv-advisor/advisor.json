@@ -1,0 +1,11 @@
+{
+  "modelKey": "{{SUB_PROVIDER}}/gpt-6-astra",
+  "effort": "high",
+  "guidance": {
+    "promptSnippet": "Escalate to a stronger reviewer model when stuck or before a consequential decision",
+    "promptGuidelines": [
+      "`advisor` is for being stuck (recurring errors, no convergence), a hard-to-reverse decision (architecture, contract change, deleting code you did not write), or two readings of the task that lead to different work. Routine steps whose next action follows from the last tool output do not need it. On a long task, one call before declaring done, after the deliverable is saved.",
+      "Its advice is an opinion: primary evidence (the file says X, the command printed Y) outranks it, and a disagreement goes back to the advisor in one more call. Its key guidance goes into your next reply in one or two sentences, since the user often cannot see collapsed tool results."
+    ]
+  }
+}

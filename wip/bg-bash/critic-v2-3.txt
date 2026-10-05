@@ -1,0 +1,23 @@
+**I would not ship. Two confirmed defects in changed logic:**
+
+1. **P1 — The drain cap silently truncates successful commands.** [index.ts:515](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:515), with stream destruction at lines 443–444.
+
+   The one-second cap applies even to a normal exit while a finite descendant is still producing output. Reproduction:
+   ```bash
+   (for ((i=1;i<=40;i++)); do echo "line-$i"; sleep 0.05; done) & exit 0
+   ```
+   In a sub-agent, the extension returned success after **1,004 ms with only lines 1–20**; installed stock 0.85.1 returned **all 40 lines after 2,039 ms**. Closing the pipes also exposes the remaining writer to SIGPIPE. This is output loss from a finite command, not the accepted limitation about deliberate daemons surviving.
+
+   **Minimal fix:** apply the hard cap only to interrupted/terminated jobs. For normal exits, retain stock’s rearmed idle timer and stream-end detection.
+
+2. **P2 — `pi-bg-wait` silently ignores the bash timeout.** [index.ts:576](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:576), [index.ts:534](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:534).
+
+   `{command: "pi-bg-wait bg1", timeout: 1}` can block for the full default **240 seconds**: dispatch passes only the signal, and `waitFor` always uses `AUTO_MS`. A scaled reproduction with a 150-ms window and a 10-ms timeout returned “still running” after **151 ms**, instead of timing out.
+
+   **Minimal fix:** pass and validate `timeout`, bound the wait by the shorter deadline, and report a timeout when that deadline wins.
+
+The earlier hand-off guards, shell-resolution ordering, stopAll waiter wake-up, exit-handler group kill, and queued-message removal are present. The drain-cap fix introduces finding 1.
+
+I found no demonstrated payload-corruption or TTL-ordering defect in the scoped cache rewrite: it upgrades the explicit breakpoint locations together, consistent with [Anthropic’s ordering requirement](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#mixing-different-ttls).
+
+Verification used real subprocesses with in-memory log mocks; no files were modified.

@@ -1,0 +1,8 @@
+Cold, harsh read-only review. `index.ts` is a pi 0.85.1 TUI extension (tool-groups) that collapses consecutive tool calls into one summary row; `round4.diff` is the latest change against `index.ts.round3`. pi source: `pi-0.85.1-src/` and `/home/slanycukr/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/`.
+
+Round 4 claims to fix three findings from the previous review:
+1. Enabling showCacheMissNotices in /settings redraws the transcript without a session event -> build() now re-reads the setting each rebuild, and render() detects a new row component for an already-drawn call id (new `context.state` object) and schedules one refresh 100 ms later (pi queues its settings write).
+2. The last-good-settings fallback was module-local and lost on /reload (module re-import) -> the parsed-settings cache is now process-wide on globalThis, keyed by file path.
+3. A row whose tool stops resolving to this extension kept its stale group summary while the next member reappeared -> view() now gives such rows a one-call summary (tool name remembered per row) so refresh() invalidates them.
+
+Tasks: (A) verify each fix against pi 0.85.1 with an in-memory harness where practical; (B) look only for regressions introduced by round4.diff (timer lifetime after shutdown/reload, WeakSet/state semantics, extra invalidations or render loops, cost of re-reading settings in build(), rows that now draw a summary where they previously drew nothing). No style nits, no re-litigating earlier rounds. Per finding: severity P0-P3, file:line, concrete scenario, how verified, minimal fix. Then score the extension 1-10 for shipping to a single interactive user and name each gap below 10. Verdict: ship / fix-then-ship / do-not-ship.

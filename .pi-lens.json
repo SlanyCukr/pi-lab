@@ -1,0 +1,12 @@
+{
+  "ignore": ["**/backup-*/**", "**/*.orig"],
+  "rules": {
+    "style-only": {
+      "disable": [
+        "unchecked-throwing-call", "unchecked-throwing-call-python", "unchecked-throwing-call-js",
+        "require-safety-comment-for-as-unknown-as", "no-unsafe-dictionary-any", "no-unknown-returns",
+        "SIM115", "E501", "E701", "E702", "E703", "I001", "W291", "W292", "W293"
+      ]
+    }
+  }
+}

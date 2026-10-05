@@ -1,0 +1,34 @@
+{
+  // Allow by default, matching a bypass-style workflow. Guard only destructive commands and secret paths.
+  // Note: bash deny patterns match the literal spelling, so quoting tricks can slip past them. The path rules are the stronger guard.
+  // yoloMode auto-approves every "ask" (wrapper floors like `timeout`/`env`, unparseable heredocs, and the ask rules below). Explicit "deny" rules still deny.
+  "yoloMode": true,
+  "permission": {
+    "*": "allow",
+    "bash": {
+      "*": "allow",
+      "sudo *": "ask",
+      "git push --force*": "ask",
+      "git push -f*": "ask",
+      "git reset --hard*": "ask",
+      "git clean *": "ask",
+      // `*` is always a wildcard (no escape) and the LAST matching rule wins.
+      // So: deny every absolute path, re-allow scratch paths under /tmp, then
+      // re-deny a /tmp command that also names a path outside /tmp or under ~.
+      "rm -rf /*": "deny",
+      "rm -rf /tmp/*": "allow",
+      "rm -rf /tmp/* /*": "deny",
+      "rm -rf /tmp/* ~*": "deny",
+      "rm -rf ~*": "deny"
+    },
+    "path": {
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "~/.ssh": "deny",
+      "~/.ssh/*": "deny",
+      "~/.pi/agent/auth.json": "deny",
+      "~/.codex/auth.json": "deny"
+    }
+  }
+}

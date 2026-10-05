@@ -1,0 +1,9 @@
+{
+  "guidance": {
+    "promptSnippet": "Track multi-step work as a task list",
+    "promptGuidelines": [
+      "`todo` holds the plan for work with 3 or more steps, a list of tasks from the user, or a sweep (one task per unit); single small tasks and conversation go without it. No plan or checklist files alongside it.",
+      "One task is in_progress at a time, set before you start it. A task is completed when it is done and its tests pass; partial work stays in_progress with a new task for the blocker. Example: {\"action\":\"update\",\"id\":3,\"status\":\"in_progress\",\"activeForm\":\"writing tests\"}."
+    ]
+  }
+}

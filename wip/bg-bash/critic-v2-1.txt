@@ -1,0 +1,13 @@
+**Would not ship.** Four defects in changed logic, reproduced using an in-memory harness with mocked processes, timers, and filesystem operations. No files modified; no live-process integration test.
+
+1. **P1 — Hand-off overrides an already-triggered timeout or abort.** [index.ts:389](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:389), timeout callback at line 401.  
+   With `timeout: 240`, the timeout callback can send SIGKILL, then the hand-off timer runs before Node processes the child’s exit. `handOff()` ignores `job.timedOut` and `job.aborted`, resolves `{exitCode: 0}`, and advertises “still running.” An abort immediately before hand-off has the same failure. Stock would reject the command. **Minimal fix:** prevent hand-off once aborted, timed out, or terminating; clear the auto timer when cancellation starts and let completion reject.
+
+2. **P1 — Cache rewriting changes tool arguments and schemas.** [cache-ttl.ts:40](/home/slanycukr/pi-lab/wip/bg-bash/cache-ttl.ts:40).  
+   The recursive visitor treats every nested `cache_control` as provider metadata. A historical `tool_use.input` containing `{cache_control:{type:"ephemeral",ttl:"5m"}}` is silently changed to `"1h"` in the outgoing conversation. Likewise, a tool schema’s `const`, `enum`, or default can be altered, changing the advertised tool contract. The harness reproduced the argument mutation. **Minimal fix:** rewrite only documented Anthropic breakpoint locations on system blocks, tool definitions, and message content blocks; preserve tool inputs and schemas verbatim.
+
+3. **P2 — Stopping a job strands its pending waiter and later reports it alive.** [index.ts:456](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:456), interacting with lines 227–233 and 511–529.  
+   If `stopAll()` runs while `pi-bg-wait` is pending, it deletes the job and clears `running`. Completion then returns before setting `job.result` or waking `onDone`. The wait remains blocked until its 240-second timer expires, then says “still running” and recommends waiting on an ID already deleted. **Minimal fix:** record a stopped result and wake waiters during cancellation; suppress follow-up delivery separately.
+
+4. **P2 — Invalid shell configuration leaks an FD per attempt.** [index.ts:343](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:343).  
+   The log FD opens before `getShellConfig()`, which throws for a nonexistent configured shell path outside the cleanup `try`. Repeated attempts accumulate descriptors. V1 resolved the shell inside its `try/finally`. **Minimal fix:** resolve the shell before opening the log, or include resolution in descriptor cleanup.

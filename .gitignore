@@ -1,0 +1,18 @@
+# Public repo: nothing derived from real sessions, no loop, no caches.
+# The find-gaps loop (runner, board, run state) is not part of this repo.
+wip/find-gaps/
+wip/find-gaps-board/
+# Excerpts of private sessions (eval cases, model outputs, chat logs)
+wip/pi-eval/cases.json
+wip/pi-eval/runs/
+wip/pi-eval/runs-ac/
+research/*user-messages*
+*.jsonl
+# Caches and scratch
+.ruff_cache/
+__pycache__/
+node_modules/
+*.log
+*.orig
+# Private agent instructions (host details); pi loads it instead of AGENTS.md
+AGENTS.override.md

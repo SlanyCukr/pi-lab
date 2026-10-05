@@ -1,0 +1,13 @@
+**I would not ship it yet.** Two remaining defects, ranked by severity:
+
+1. **P1 — Wake-up can pre-empt an already submitted prompt.** [index.ts:217](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:217), with dispatch at line 180. Pi 0.85.1 awaits `input` handlers sequentially. If an earlier extension’s handler awaits I/O, this handler has not established its reservation, `agentRunning` remains false, and `ctx.isIdle()` remains true. A background completion starts a turn; when the original input handler resumes, normal `prompt()` without `streamingBehavior` rejects with “Agent is already processing.” This requires neither a 60-second delay nor failed preparation.
+
+   **Minimal fix:** ensure this reservation handler runs before every asynchronous input handler. The robust fix is a pi-level prompt-preparation busy state established before input dispatch and exposed through `isIdle()`; this extension alone cannot guarantee handler ordering.
+
+2. **P2 — Process-exit listeners accumulate across reloads.** [index.ts:261](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:261). Every extension initialization installs another `process.once("exit")` listener. `session_shutdown` never removes it, even after all owned groups disappear. Repeated `/reload` therefore retains obsolete callbacks and group maps until process exit and eventually emits `MaxListenersExceededWarning`.
+
+   **Minimal fix:** use a named exit handler; remove it after shutdown once `groups` becomes empty. Keep it installed during outstanding escalation so exiting during the grace period still kills surviving workers.
+
+Both behaviors reproduced in an **in-memory mocked harness** using the actual extension: one premature wake-up followed by prompt rejection; eleven retained exit listeners after eleven initialization/shutdown cycles. Pi’s installed 0.85.1 dispatch code corroborates the ordering.
+
+I found no additional blocker in fd closure, spawn-error handling, group ownership/escalation, shutdown settlement, timer unref behavior, private log permissions, UTF-8 continuation skipping, or foreground delegation within your accepted settings policy. These were inspected, not validated through live process-race integration tests. No files were modified.

@@ -1,0 +1,12 @@
+anthropic_claude-sonnet-5-5-medium	g80	1	0	61	 Tests 1 failed | 5 passed (6)
+anthropic_claude-opus-5-5-medium	g80	1	0	102	 Tests 6 passed (6)
+anthropic_claude-sonnet-5-5-medium	g68	1	0	78	1 failed, 8 passed, 9 warnings in 5.28s
+anthropic_claude-opus-5-5-medium	g68	1	0	238	1 failed, 8 passed, 9 warnings in 5.26s
+anthropic_claude-sonnet-5-5-medium	g23	1	0	148	8 passed, 9 warnings in 13.07s
+anthropic_claude-opus-5-5-medium	g80	2	0	134	 Tests 6 passed (6)
+anthropic_claude-sonnet-5-5-medium	g80	2	0	71	 Tests 1 failed | 5 passed (6)
+anthropic_claude-opus-5-5-medium	g23	1	0	313	8 passed, 9 warnings in 11.76s
+anthropic_claude-sonnet-5-5-medium	g68	2	0	139	1 failed, 8 passed, 9 warnings in 4.97s
+anthropic_claude-opus-5-5-medium	g68	2	0	223	1 failed, 8 passed, 9 warnings in 4.95s
+anthropic_claude-sonnet-5-5-medium	g23	2	0	74	8 passed, 9 warnings in 12.14s
+anthropic_claude-opus-5-5-medium	g23	2	0	211	8 passed, 9 warnings in 11.45s

@@ -1,0 +1,92 @@
+--- /home/slanycukr/pi-lab/backup-20260922-toolsurface/pi-permission-system-32.1.0-src/exposure/tool-surface-prompt.ts	2026-09-22 20:16:30.860606843 +0200
++++ /home/slanycukr/.pi/agent/local-packages/pi-permission-system/src/exposure/tool-surface-prompt.ts	2026-09-22 20:17:34.973636523 +0200
+@@ -52,6 +52,27 @@
+   end: number;
+ };
+ 
++/**
++ * LOCAL PATCH (upstream gotgenes/pi-packages#962, see ~/pi-lab/REPORT.md).
++ *
++ * From pi 0.86 on, Pi writes its tool surface as tagged sections: the tool
++ * list in `<tools>` and the guideline bullets in `<rules>`, each tag on its
++ * own line. The plain headers below never match there, so without this the
++ * narrowed block was appended under Pi's unfiltered one.
++ */
++const PI_TAGGED_TOOL_SURFACE_SECTIONS = ["tools", "rules"] as const;
++
++/**
++ * Opening tags of the sections Pi writes after its tool surface. A `<tools>`
++ * or `<rules>` section that starts past the first of these is not Pi's.
++ */
++const PI_LATER_SECTION_OPENS: ReadonlySet<string> = new Set([
++  "<addendum>",
++  "<project_context>",
++  "<skills>",
++  "<cwd>",
++]);
++
+ const AVAILABLE_TOOLS_SECTION_HEADER = "Available tools:";
+ const GUIDELINES_SECTION_HEADER = "Guidelines:";
+ 
+@@ -95,8 +116,8 @@
+   const lines = normalizePrompt(systemPrompt).split("\n");
+   const tailStart = extensionTailStart(lines);
+   const body = [
+-    settleRegion(lines.slice(0, tailStart), inputs.piAuthoredPreamble),
+-    settleRegion(lines.slice(tailStart), true),
++    settleRegion(lines.slice(0, tailStart), inputs.piAuthoredPreamble, true),
++    settleRegion(lines.slice(tailStart), true, false),
+   ]
+     .filter((region) => region.length > 0)
+     .join("\n")
+@@ -138,11 +159,15 @@
+ function settleRegion(
+   lines: readonly string[],
+   removalAllowed: boolean,
++  piTaggedSections: boolean,
+ ): string {
+   if (!removalAllowed) {
+     return lines.join("\n");
+   }
+-  const kept = removeToolSurfaceSections(lines);
++  const untagged = removeToolSurfaceSections(lines);
++  const kept = piTaggedSections
++    ? removePiTaggedToolSurface(untagged)
++    : untagged;
+   const text = kept.join("\n");
+   return kept.length === lines.length ? text : collapseExtraBlankLines(text);
+ }
+@@ -176,6 +201,33 @@
+   );
+ }
+ 
++/**
++ * Remove Pi's own `<tools>` and `<rules>` sections (pi >= 0.86), tags included.
++ *
++ * Only a section whose opening tag comes before the first of Pi's later
++ * sections, and whose closing tag follows it before that point, is removed:
++ * that is where Pi writes them, right under its preamble. The same tags
++ * quoted further down, in the addendum or a context file, are left alone.
++ */
++function removePiTaggedToolSurface(lines: readonly string[]): string[] {
++  let remaining = [...lines];
++  for (const name of PI_TAGGED_TOOL_SURFACE_SECTIONS) {
++    const laterAt = remaining.findIndex((line) =>
++      PI_LATER_SECTION_OPENS.has(line),
++    );
++    const limit = laterAt === -1 ? remaining.length : laterAt;
++    const openAt = remaining.indexOf(`<${name}>`);
++    if (openAt === -1 || openAt >= limit) continue;
++    const closeAt = remaining.indexOf(`</${name}>`, openAt + 1);
++    if (closeAt === -1 || closeAt >= limit) continue;
++    remaining = [
++      ...remaining.slice(0, openAt),
++      ...remaining.slice(closeAt + 1),
++    ];
++  }
++  return remaining;
++}
++
+ /** This session's tool surface, as Pi would have rendered it. */
+ function renderToolSurfaceBlock(inputs: ToolSurfaceInputs): string {
+   const sections: string[] = [];

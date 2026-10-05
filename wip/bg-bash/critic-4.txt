@@ -1,0 +1,19 @@
+**I would not ship it.** Four defects remain, ranked by severity. Checked against installed pi **0.85.1**; nothing modified.
+
+1. **P1 — Prompt preparation still races background wake-ups** — [index.ts:166](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:166), delivery at line 126.  
+   Pi awaits input handlers, authentication and pre-prompt compaction **before** emitting `before_agent_start`; earlier extensions’ asynchronous `before_agent_start` handlers also run before yours. During those awaits, `agentRunning` remains false. A job finishing then starts an agent run through `sendMessage`. The original prompt can subsequently reach `agent.prompt` while that run is active and fail. This is distinct from the accepted failure *after* your busy flag is set.  
+   **Fix:** serialize wake-ups with prompt submission using a reservation established before pi’s first preparation await, released on preparation failure. The current extension events alone do not provide that complete boundary; merely checking `isIdle()` does not close it.
+
+2. **P2 — Global shell settings are not interpreted like stock settings** — [index.ts:35](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:35), foreground delegation at line 278.  
+   Stock `SettingsManager.getShellPath()` normalizes paths, including `~/bin/bash` and file URLs. This code passes them literally to `getShellConfig`, which rejects an otherwise valid configured shell. Foreground calls therefore regress too. Additionally, stock strips a UTF-8 BOM before parsing settings; this reader silently discards all settings when one exists, including the command prefix.  
+   **Fix:** strip the BOM and apply stock-equivalent shell-path normalization while retaining the deliberate global-only policy.
+
+3. **P2 — PATH augmentation changes command resolution** — [index.ts:51](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:51).  
+   With `PATH=:/usr/bin` and pi’s bin directory absent, filtering empty entries removes the current-directory search component. A local executable that stock bash finds becomes “command not found” in background mode. Stock uses filtered entries only for membership testing, then prepends to the **original** PATH string.  
+   **Fix:** preserve the original string when constructing the augmented PATH.
+
+4. **P3 — Single-line tails still contain broken leading UTF-8** — [index.ts:92](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:92).  
+   Without a newline, `indexOf()` returns `-1`, so `whole` equals the entire text and bypasses replacement-character removal. An in-memory probe using `"é".repeat(3001) + "x"` and the default 6000-byte tail returned leading `U+FFFD`.  
+   **Fix:** handle “no newline” explicitly, preferably skipping leading UTF-8 continuation bytes before decoding.
+
+The fd closure, spawn-error listener, shutdown/exit deduplication, group-ownership escalation, unref/exit fallback, and private log permissions revealed no additional defect under the accepted assumptions.

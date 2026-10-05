@@ -1,0 +1,18 @@
+**I would not ship it.** Reviewed against the installed pi 0.85.1 source; nothing modified.
+
+1. **High — Completion delivery can collide with prompt preparation** — [index.ts:130](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:130), line 164.  
+   `agentRunning` covers only `agent_start` through `agent_end`. Pi awaits prompt preparation, including `before_agent_start` handlers, before emitting `agent_start`. If a job finishes during a slow handler, this extension starts another run; the original submission subsequently attempts to start while that run is active and can fail with “Agent is already processing.” The deferred callback also bypasses the guard. **Fix:** serialize completion wakeups with prompt preparation and settlement; make deferred delivery recheck that state. Merely adding another `setImmediate` does not establish safety.
+
+2. **Medium — Stock shell environment is still missing** — [index.ts:48](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:48).  
+   Pi 0.85.1 does **not** export `getShellEnv` from its public entry point. This therefore always falls back to `process.env`, omitting the agent’s binary directory from `PATH`. A command using a binary available through stock bash can fail only when backgrounded. The `PI_*` fields themselves match stock. **Fix:** reproduce stock’s PATH augmentation using the exported `getAgentDir()` and platform path delimiter.
+
+3. **Medium — Background execution selects a different shell** — [index.ts:191](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:191).  
+   Stock prefers `/bin/bash`, then searches PATH, then falls back to `sh`. This code searches PATH directly. A PATH containing another `bash` changes execution semantics; a system with only `sh` fails entirely. **Fix:** use pi’s exported `getShellConfig(shellPath)` and its resolved arguments.
+
+4. **Medium — Large timeouts kill commands almost immediately** — [index.ts:207](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:207).  
+   `timeout: 2592000` requests 30 days, but Node converts the overflowing timer to **1 ms**, initiating termination immediately. Stock rejects this timeout before spawning. Nonpositive values also silently disable the timeout here. **Fix:** apply stock’s finite, positive, maximum-timer validation before spawning. Confirmed the overflow with a read-only Node probe.
+
+5. **Medium — Tail handling discards all available output** — [index.ts:87](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:87).  
+   A single 7,000-character JSON/error line ending with newline becomes an empty tail and is reported as “(no output).” Confirmed with the exact slicing logic. **Fix:** preserve the final line’s suffix, removing only incomplete leading UTF-8 bytes.
+
+The fd closure, spawn-error listener, group-ownership escalation, shutdown suppression, and private log permissions look sound within your accepted risks. I found no additional defect in those fixes.

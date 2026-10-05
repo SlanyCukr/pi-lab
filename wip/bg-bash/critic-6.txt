@@ -1,0 +1,15 @@
+**I would not ship it yet.** Two defects remain, reproduced with an in-memory harness using the actual source and mocked processes/timers. I also checked the installed pi v0.85.1 implementation. Nothing was modified.
+
+1. **P1 — An older run clears a newer input’s busy reservation.** [index.ts:233](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:233)  
+   While run A is active, input B reaches this extension’s `input` handler, then awaits another extension’s asynchronous input handler. A ends and unconditionally clears `reservedUntil`. Once pi becomes idle, a queued background result starts another run while B is still being prepared—well within the accepted 60-second window. When B resumes, pi can reject it with “Agent is already processing” if no streaming behavior was supplied, or unexpectedly queue it behind the background turn.
+
+   The harness observed **one wake-up while B remained pending**.  
+   **Minimal fix:** Associate reservations with an input/run generation; `agent_end` must clear only the reservation consumed by that run. Conservatively retaining the reservation until expiry also closes this particular hole.
+
+2. **P2 — Timeout completion is announced before termination finishes.** [index.ts:303](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:303), [index.ts:187](/home/slanycukr/pi-lab/wip/bg-bash/index.ts:187)  
+   A shell waits on a worker that ignores SIGTERM. Timeout signals the group; the shell exits, but the worker keeps running throughout the two-second grace period. `finish()` immediately removes the job, snapshots its log, and announces “finished: killed after … timeout.” The awakened agent can retry a build or deploy while the previous worker still modifies the same files. Output produced during the grace period also misses the completion tail.
+
+   The harness emitted the completion message with **only SIGTERM sent and SIGKILL still pending**.  
+   **Minimal fix:** For terminating jobs, retain the job and defer final tail capture, slot release, and notification until the escalation callback has sent SIGKILL. Preserve shutdown suppression.
+
+I found no additional confirmed blocker in the fd closure, spawn-error listener, group ownership checks, private log permissions, or leading UTF-8 continuation-byte handling. The harness was not a live pi integration test.
