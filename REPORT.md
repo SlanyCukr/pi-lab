@@ -61,6 +61,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## How to work here (gotchas)
 
+- The ISP caps concurrent connections per line (2026-10-05): over the cap, new connections fail with ICMP "administratively prohibited" (seen as "no route to host" / errno 113) from inside the ISP's network, not the router. Measured headroom was only ~300–640 extra connections. A torrent client's half-open peer attempts used ~100–140 of it (the user stopped seeding); parallel fetchers did the rest. Burst-y GitHub or scraping failures: check this first.
 - Long jobs on production: one process at a time, each in its own `docker compose run --rm --no-deps -T worker …` container, with find-gaps pushes held (`hold-push`). Inside the live worker (512 MiB) three backfills OOM-killed it, and three parallel fetchers made ~35% of the host's new connections fail upstream (0% with one) (2026-10-05).
 
 ### Running pi
