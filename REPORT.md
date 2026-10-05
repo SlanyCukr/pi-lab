@@ -233,7 +233,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## History
 
-- 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`; G180 prod backfills (echo24 1264 credits; missing bylines running)
+- 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`, scheduled-run failures handed to cycles (G184); G180 prod backfills (echo24 1264 credits; missing bylines running)
 - 2026-10-04 — Pi loop check; auto-continue stops on prices; stale PRs riot-api-project#9, security-money-maker#2 closed; cycles get 45 min past 3 h for a running review; ImageMagick on the Pi
 
 - 2026-09-24 — Lean append (A/B −26 %/task); `/loop` tools hidden; pi-lens style rules off; Guidelines 3.6K → 2.2K
