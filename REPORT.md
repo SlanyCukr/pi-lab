@@ -60,6 +60,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## How to work here (gotchas)
 
+- Docker on the host (2026-10-06): 29.6.1's buildkit (v0.31.1) crashed dockerd mid-build (`concurrent map iteration and map write`, moby/buildkit#6915), and containers with `restart: unless-stopped` stayed down for 1.5 h. Fixed by Docker 29.8.2 (buildkit v0.33.1) and `"live-restore": true` in `/etc/docker/daemon.json` (containers kept running through the upgrade). The find-gaps loop's own unit is transient; `~/.config/systemd/user/find-gaps-boot.service` starts it again after a reboot unless the last runner.log line was "run end".
 - The ISP caps concurrent connections per line (2026-10-05): over the cap, new connections fail with ICMP "administratively prohibited" (seen as "no route to host" / errno 113) from inside the ISP's network, not the router. Measured headroom was only ~300–640 extra connections. A torrent client's half-open peer attempts used ~100–140 of it (the user stopped seeding); parallel fetchers did the rest. Burst-y GitHub or scraping failures: check this first.
 - Long jobs on production: one process at a time, each in its own `docker compose run --rm --no-deps -T worker …` container, with find-gaps pushes held (`hold-push`). Inside the live worker (512 MiB) three backfills OOM-killed it, and three parallel fetchers made ~35% of the host's new connections fail upstream (0% with one) (2026-10-05).
 
