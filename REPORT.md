@@ -234,6 +234,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## History
 
+- 2026-10-07 — find-gaps: discovery gets Easy-to-use and Looks-good explorers (motion included); every 24 cycles a cycle re-judges declined findings; ledger over 32 KB or tools README over 10 KB is handed over for trimming. Approved prod jobs run (organisation merge, ParlamentníListy replay, title backfill)
 - 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`, scheduled-run failures handed to cycles (G184); G180 prod backfills done (echo24 codes 1264; missing bylines: 709 credited, 3006 recredited)
 - 2026-10-04 — Pi loop check; auto-continue stops on prices; stale PRs riot-api-project#9, security-money-maker#2 closed; cycles get 45 min past 3 h for a running review; ImageMagick on the Pi
 
