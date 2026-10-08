@@ -2,6 +2,9 @@
 # The find-gaps loop (runner, board, run state) is not part of this repo.
 wip/find-gaps/
 wip/find-gaps-board/
+# The daily harness review (reads the loop and private sessions) and its reports
+wip/harness-review/
+reviews/
 # Excerpts of private sessions (eval cases, model outputs, chat logs)
 wip/pi-eval/cases.json
 wip/pi-eval/runs/
