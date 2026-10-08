@@ -63,7 +63,7 @@ const TRIMS: Record<string, Trim> = {
 	},
 	edit: {
 		description:
-			"Edit one file by exact text replacement. Each edits[].oldText must match one unique region of the original file (edits are not applied one after another) and must not overlap another. Several changes to one file go in one call; merge nearby changes into one edit and keep oldText short.",
+			"Edit one file by exact text replacement. Each edits[].oldText must match one unique region of the original file (edits are not applied one after another) and must not overlap another. Several changes to one file go in one call; merge nearby changes into one edit and keep oldText short. Tool calls in one message run at the same time, so read the edited file in a later message, not beside the edit.",
 		params: { edits: "Replacements, each {oldText, newText}, all matched against the original file." },
 	},
 	schedule_wakeup: {

@@ -28,7 +28,7 @@ the locally patched `~/.pi/agent/local-packages/pi-permission-system-33.0.8` (33
 
 Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 `bg-bash` (background bash + sub-agent hand-off, `monitor: true`/`persistent` watches, `/loop` + `schedule_wakeup` + `loop` tool, pi-web liveness hold; `index.ts` + `loop.ts`), `cache-ttl` (1 h prompt cache, main session; pins the hooked system prompt in wake-up runs), `compact-at` (compact at 40 %),
-`arg-fixes` (drops `"null"` placeholders in `subagent` args), `hide-tools` (hides `pi_lens_activate_tools`), `auto-continue` (on in interactive pi: an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`), `tool-groups` (collapsed tool rows, thinking display omitted), `tool-trim` (short tool descriptions, unused optional params hidden, "Available tools:" list and pi-lens skills dropped; `PI_TOOL_TRIM=0` off),
+`arg-fixes` (drops `"null"` placeholders in `subagent` args; decodes `\uXXXX` escapes in `edit` text the file does not contain), `hide-tools` (hides `pi_lens_activate_tools`), `auto-continue` (on in interactive pi: an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`), `tool-groups` (collapsed tool rows, thinking display omitted), `tool-trim` (short tool descriptions, unused optional params hidden, "Available tools:" list and pi-lens skills dropped; `PI_TOOL_TRIM=0` off),
 `pi-permission-system/config.json` (permission policy: allow by default, `yoloMode: true`, deny dotenv files, `~/.ssh`, the pi and Codex credential files, `rm -rf` outside `/tmp`).
 
 Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean version since 2026-09-24; dev copy `wip/token-audit/APPEND_SYSTEM.lean.md`), `~/.pi/agent/agents/*.md` (sub-agents; `general-purpose`/`Plan` off via `enabled: false`), `~/.agents/skills/` (4 skills: diagnose, grill-me, desloppify, find-gaps; the rest in `~/.agents/skills.disabled/`),
@@ -165,7 +165,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **Explorer turn cap 40 → 150** (2026-09-20): 5 of 17 real explorer runs hit 40.
 - **Explorers cite, do not quote; explore-glm ~1,200-word budget** (2026-09-20). GLM reports went from 8–21K chars to 770 words.
 - **Fixed report formats** (2026-09-18) for builder, reviewer ("no confirmed defects" is valid) and explorers.
-- **`arg-fixes`** (2026-09-23). Opus 5.5 sometimes sends the string `"null"` for optional `subagent` args; pi-subagents rejects unknown thinking levels on purpose. The fix edits `event.input`, so the stored message and cache are untouched.
+- **`arg-fixes`** (2026-09-23). Opus 5.5 sometimes sends the string `"null"` for optional `subagent` args; pi-subagents rejects unknown thinking levels on purpose. The fix edits `event.input`, so the stored message and cache are untouched. 2026-10-08: it also decodes `\uXXXX` escapes in `edit` oldText when only the decoded text is in the file (20 of 29 failed loop edits in a day); newText gets only non-ASCII escapes decoded, and none when the file itself uses escapes. Test: `node wip/arg-fixes/test.ts`.
 
 ### Advisor
 - **Shutdown cleanup in the local copy** (2026-09-23). The `sessionId` patch left a cached Codex WebSocket, so `pi -p` hung ~300 s after an advisor call. Now runs exit in 15–19 s.
@@ -234,7 +234,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## History
 
-- 2026-10-08 — Daily harness review: a 05:00 timer starts a headless pi session that reviews the find-gaps loop and the pi harness, makes 1–3 changes (snapshot, tests, smoke run), and reports them with diffs on the board (`/board/reviews`); the user asked for changes, not reports
+- 2026-10-08 — Daily harness review: a 05:00 timer starts a headless pi session that reviews the find-gaps loop and the pi harness, makes 1–3 changes (snapshot, tests, smoke run), and reports them with diffs on the board (`/board/reviews`); the user asked for changes, not reports. First run: `arg-fixes` decodes escaped edit text, the `edit` description says same-message calls run at once, find-gaps fresh looks drive the running app
 - 2026-10-08 — Prod: more organisation and person merges; July–September stance re-judge started (41k articles, ~2 days, z.ai quota checked first). The bulk reopen stalled the enrichment worker (claim query planned on stale stats); cancelled, worker restarted, fix sent to the loop
 - 2026-10-07 — find-gaps: discovery gets Easy-to-use and Looks-good explorers (motion included); every 24 cycles a cycle re-judges declined findings; ledger over 32 KB or tools README over 10 KB is handed over for trimming. Approved prod jobs run (organisation merge, ParlamentníListy replay, title backfill)
 - 2026-10-05 — Public repo `SlanyCukr/pi-lab` (pi-kit refreshed, `server/` installers + test); find-gaps: OOM-proof units, affected suites only, `hold-push`, scheduled-run failures handed to cycles (G184); G180 prod backfills done (echo24 codes 1264; missing bylines: 709 credited, 3006 recredited)
