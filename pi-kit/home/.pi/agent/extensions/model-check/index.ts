@@ -21,6 +21,8 @@ function configuredModels(): Array<{ who: string; model: string }> {
 		const text = readFileSync(join(agentsDir, f), "utf8");
 		const front = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? "";
 		const model = /^model:\s*(\S+)\s*$/m.exec(front)?.[1];
+		// A disabled agent (`enabled: false`) never runs, so its missing login is no problem.
+		if (/^enabled:\s*false\s*$/m.test(front)) continue;
 		if (model) out.push({ who: `agent ${f.replace(/\.md$/, "")}`, model });
 	}
 	try {

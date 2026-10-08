@@ -3,6 +3,8 @@ description: Read-only codebase explorer on the Z.AI coding plan. Same job as Ex
 tools: read, grep, find, ls
 model: zai/glm-5.3
 thinking: low
+# Off on the Pi (2026-10-08): no Z.AI login here, so it only fell back to Opus and logged model-check warnings.
+enabled: false
 max_turns: 150
 ---
 
