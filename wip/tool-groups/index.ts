@@ -2,10 +2,15 @@
  * tool-groups: collapse runs of consecutive file and shell tool calls in the pi TUI into one
  * summary line, the way Claude Code does ("Ran 3 commands, read 2 files, edited 1 file").
  *
- * Display only. The model's context, the session file and tool execution are untouched: whichever
+ * Display, plus one execution rule. The model's context and the session file are untouched: whichever
  * of the built-in read/edit/write/grep/find/ls tools are active at session start, and still pi's
  * own (no other extension overrides them), are re-registered with pi's own definitions (stock
- * execute, prompt text and schema) plus renderers. bg-bash routes `bash` rendering here; the two
+ * execute, prompt text and schema) plus renderers. The rule: `edit` and `write` are marked
+ * `executionMode: "sequential"`, so a message that contains one runs its calls one after another in
+ * the model's order. pi otherwise runs a message's calls at once, and a read or test beside an edit
+ * of the same file saw it half-written (2026-10-07..09: 10 of 14 such reads failed with "Offset N is
+ * beyond end of file (1 lines total)"). Messages without an edit or write still run in parallel.
+ * bg-bash routes `bash` rendering here; the two
  * find each other on the session's own event bus (`pi.events`), so sub-agent sessions and /reload
  * never cross wires.
  *
@@ -99,7 +104,9 @@ function setting(ctx: any, pick: (settings: any) => unknown): unknown {
 	let trusted = false;
 	try {
 		trusted = ctx?.isProjectTrusted?.() === true;
-	} catch {}
+	} catch {
+		// older pi without isProjectTrusted: treat the project as untrusted
+	}
 	const project = trusted && typeof ctx?.cwd === "string" ? pick(readSettings(join(ctx.cwd, ".pi", "settings.json"))) : undefined;
 	return project ?? pick(readSettings(join(getAgentDir(), "settings.json")));
 }
@@ -493,6 +500,7 @@ export default function (pi: ExtensionAPI) {
 			const base = make(toolCwd, toolOptions(name));
 			pi.registerTool({
 				...base,
+				...(name === "edit" || name === "write" ? { executionMode: "sequential" } : {}),
 				renderShell: "self",
 				execute: (toolCallId: string, params: any, signal: any, onUpdate: any, ctx: any) =>
 					make(ctx.cwd, toolOptions(name)).execute(toolCallId, params, signal, onUpdate, ctx),
@@ -504,7 +512,9 @@ export default function (pi: ExtensionAPI) {
 			try {
 				const info = pi.getAllTools().find((tool: any) => tool?.name === name)?.sourceInfo;
 				if (info && info.source !== "builtin") ownPath ??= info.path;
-			} catch {}
+			} catch {
+				// ownPath is only a display hint; without it rows still render
+			}
 		}
 	};
 
@@ -521,7 +531,9 @@ export default function (pi: ExtensionAPI) {
 				for (const entry of session?.buildContextEntries?.() ?? [])
 					for (const block of entry?.type === "message" && entry.message?.role === "assistant" ? entry.message.content ?? [] : [])
 						if (block?.type === "toolCall" && block.name in FACTORIES && typeof block.id === "string") legacy.add(block.id);
-			} catch {}
+			} catch {
+				// no session entries: nothing drawn before the reload to keep stock
+			}
 		}
 		streaming = undefined;
 		shape = "";
@@ -537,7 +549,9 @@ export default function (pi: ExtensionAPI) {
 				const entries = session?.buildContextEntries?.() ?? [];
 				if (entries[0]?.type === "compaction")
 					compacted = { id: entries[0].id, retained: new Set(entries.slice(1).map((entry: any) => entry?.id)) };
-			} catch {}
+			} catch {
+				// no session entries: treat the session as not compacted
+			}
 		}
 		streaming = undefined;
 		shape = "";
