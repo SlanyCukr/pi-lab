@@ -16,6 +16,14 @@
  *    `\u000a` or `\u0022` stays), never after a backslash (`\\u00e9` stays), and only when the
  *    file itself writes no non-ASCII character as an escape. Text found as written is never touched.
  *
+ * 3. Control characters in edit or write text. Next to a non-ASCII letter, Opus sometimes emits a
+ *    broken JSON escape instead of the letter: `Zpravodajov\b\b\b\b`, `Upozorn\fd`. Over the find-gaps
+ *    run to 2026-10-10, 56 edit calls carried a backspace, form feed or similar: 43 failed with a
+ *    misleading "text not found" (often retried unchanged, up to 3 times), and 13 wrote the control
+ *    characters into files (ledger, tests, source). Such a call is now blocked with a reason that
+ *    names the character and the text before it, unless the file already contains that character.
+ *    Tab, newline and carriage return are never blocked.
+ *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
  * touched.
@@ -84,13 +92,46 @@ export function fixEscapedEdits(input: any, cwd: string): number {
 	return fixed;
 }
 
+// C0 controls except tab, newline and carriage return, plus DEL.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const NAMES: Record<string, string> = { "\b": "backspace", "\f": "form feed", "\v": "vertical tab", "\u0000": "NUL", "\u001B": "escape", "\u007F": "delete" };
+
+/** Why an edit/write call carries a stray control character, or undefined. Exported for the test. */
+export function controlCharProblem(toolName: string, input: any, cwd: string): string | undefined {
+	const fields: [string, unknown][] =
+		toolName === "write"
+			? [["content", input?.content]]
+			: (Array.isArray(input?.edits) ? input.edits : [input]).flatMap((e: any, i: number) => [
+					[Array.isArray(input?.edits) ? `edits[${i}].oldText` : "oldText", e?.oldText],
+					[Array.isArray(input?.edits) ? `edits[${i}].newText` : "newText", e?.newText],
+				]);
+	let text: string | undefined | null = null; // null: not read yet
+	for (const [name, value] of fields) {
+		if (typeof value !== "string") continue;
+		for (const m of value.matchAll(CONTROL)) {
+			if (text === null) text = fileText(input?.path, cwd);
+			if (text?.includes(m[0])) continue; // the file already has this one: may be intended
+			const code = `U+${m[0].charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+			const before = JSON.stringify(value.slice(Math.max(0, m.index - 30), m.index));
+			return (
+				`${toolName} blocked: ${name} contains the control character ${code}${NAMES[m[0]] ? ` (${NAMES[m[0]]})` : ""} after ${before}, ` +
+				"and the file has none. This is a broken escape, usually where a non-ASCII letter (\u00e9, \u0161, \u0159, \u016f) was meant. " +
+				"Write the letter itself, or copy the exact text from a fresh read of the file. Nothing was changed."
+			);
+		}
+	}
+	return undefined;
+}
+
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", (event: any, ctx: any) => {
 		const input = event?.input;
 		if (!input || typeof input !== "object") return undefined;
-		if (event.toolName === "edit") {
-			fixEscapedEdits(input, ctx?.cwd ?? process.cwd());
-			return undefined;
+		if (event.toolName === "edit" || event.toolName === "write") {
+			const cwd = ctx?.cwd ?? process.cwd();
+			if (event.toolName === "edit") fixEscapedEdits(input, cwd);
+			const reason = controlCharProblem(event.toolName, input, cwd);
+			return reason ? { block: true, reason } : undefined;
 		}
 		const fields = FIELDS[event?.toolName];
 		if (!fields) return undefined;
