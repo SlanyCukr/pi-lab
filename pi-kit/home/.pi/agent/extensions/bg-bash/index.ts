@@ -889,28 +889,64 @@ export default function (pi: ExtensionAPI) {
 				}
 				return { content: [{ type: "text", text: parts.join("\n\n") }], details: undefined as any };
 			}
-			// Text of the waits and stops lifted out of a mixed command, put before the rest's result.
+			// A mixed command (mixed.ts) runs in its written order; `lead` is the text of the parts before the last
+			// bash part, put in front of that part's result or error.
 			let lead = "";
 			const mixed = MIXED_WAIT.test(rest.command ?? "") ? splitMixed(rest.command ?? "") : "plain";
 			if (!mixed || (monitor && mixed !== "plain")) {
 				throw new Error(
-					"pi-bg-wait and pi-bg-stop are answered by this tool, not by bash: they run first when joined to other commands with && or ;, but not after a pipe, || or &, in a subshell, in a monitor, or in a command with a heredoc. Send them as their own call, or joined with && or ;.",
+					"pi-bg-wait and pi-bg-stop are answered by this tool, not by bash. They can open or close a command, joined with && or ; (`pi-bg-wait bg1 && tail log`, `git status; pi-bg-stop bg2`), but not stand between two other commands, follow a pipe, || or &, sit in a subshell or a monitor, or share a command with a heredoc. Send them as their own call otherwise.",
 				);
 			}
 			if (mixed !== "plain") {
 				const parts: string[] = [];
-				for (const op of mixed.ops) {
-					let text: string;
+				const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+				let ok = true; // the last part succeeded (a wait: its job has finished)
+				let broke = false; // the last part failed outright (non-zero exit, no such job): the call is an error
+				let j = 0; // next joiner
+				if (mixed.before) {
+					// plain bash, no hand-off: the waits behind it must see it finished
 					try {
-						text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout) : stop(op.id);
+						const r: any = await createBashToolDefinition(ctx.cwd, options).execute(toolCallId, { ...rest, command: mixed.before }, signal, onUpdate, ctx);
+						ok = !r?.isError; // stock bash returns a non-zero exit as isError, not as a throw
+						parts.push(`== ${mixed.before}\n${(r.content ?? []).map((c: any) => c.text ?? "").join("")}`);
 					} catch (e) {
-						text = e instanceof Error ? e.message : String(e);
+						if (signal?.aborted) throw e;
+						ok = false;
+						parts.push(`== ${mixed.before}\n${message(e)}`);
 					}
-					parts.push(`== pi-bg-${op.kind} ${op.id}\n${text}`);
+					broke = !ok;
 				}
-				if (!mixed.rest) return { content: [{ type: "text", text: parts.join("\n\n") }], details: undefined as any };
-				lead = `${parts.join("\n\n")}\n\n== then: ${mixed.rest}\n`;
-				rest.command = mixed.rest;
+				let skipped = "";
+				for (const [i, op] of mixed.ops.entries()) {
+					if (i > 0 || mixed.before) {
+						if (mixed.joins[j++] === "&&" && !ok) {
+							skipped = [...mixed.ops.slice(i).map((o) => `pi-bg-${o.kind} ${o.id}`), mixed.after].filter(Boolean).join("; ");
+							break;
+						}
+					}
+					try {
+						const text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout) : stop(op.id);
+						// a wait succeeds only when its job has finished, as a real `wait` would
+						ok = op.kind === "stop" || Boolean(jobs.get(op.id)?.result);
+						broke = false;
+						parts.push(`== pi-bg-${op.kind} ${op.id}\n${text}`);
+					} catch (e) {
+						if (signal?.aborted) throw e;
+						ok = false;
+						broke = true;
+						parts.push(`== pi-bg-${op.kind} ${op.id}\n${message(e)}`);
+					}
+				}
+				const afterJoin = mixed.after ? mixed.joins[mixed.joins.length - 1] : undefined;
+				if (mixed.after && !skipped && afterJoin === "&&" && !ok) skipped = mixed.after;
+				if (skipped || !mixed.after) {
+					const text = parts.join("\n\n") + (skipped ? `\n\nNot run, because the part before \`&&\` failed or is still running: ${skipped}` : "");
+					if (broke) throw new Error(text);
+					return { content: [{ type: "text", text }], details: undefined as any };
+				}
+				lead = `${parts.join("\n\n")}\n\n== ${mixed.after}\n`;
+				rest.command = mixed.after;
 			}
 			const withLead = async (run: () => Promise<any>) => {
 				if (!lead) return run();
