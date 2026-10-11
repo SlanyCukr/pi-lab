@@ -52,6 +52,7 @@ import { fileURLToPath } from "node:url";
 import { createBashToolDefinition, type ExtensionAPI, getAgentDir, getShellConfig } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { registerLoops } from "./loop.ts";
+import { splitMixed } from "./mixed.ts";
 
 const AUTO_MS = Number(process.env.PI_BG_BASH_AUTO_SECONDS ?? 240) * 1000;
 const MAX_JOBS = Number(process.env.PI_BG_BASH_MAX_JOBS ?? 8);
@@ -74,8 +75,8 @@ const WAIT_COMMAND = new RegExp(CD_PREFIX + String.raw`pi-bg-wait\s+(?:bg)?(\d+)
 const STOP_COMMAND = new RegExp(CD_PREFIX + String.raw`pi-bg-stop\s+(bg\d+|\d+|loop\d+)\s*$`);
 const jobId = (id: string) => (/^\d+$/.test(id) ? `bg${id}` : id);
 // Several waits chained with && (`pi-bg-wait bg1 && pi-bg-wait bg2`, 8 times in the reviews of 2026-10-01): wait for
-// each in turn. Any other command mixed with pi-bg-wait goes to bash, which has no such program, so it is refused
-// here with a message saying how to split it.
+// each in turn. Waits and stops mixed with other commands run first, then the rest goes to bash (mixed.ts); a mix
+// that cannot be split safely is refused here with a message saying how to split it.
 const WAIT_CHAIN = new RegExp(CD_PREFIX + String.raw`(pi-bg-wait\s+(?:bg)?\d+(?:\s*&&\s*pi-bg-wait\s+(?:bg)?\d+)+)\s*$`);
 // only in command position with an id, so `grep pi-bg-wait index.ts` or `echo 'pi-bg-wait bg1'` still run
 const MIXED_WAIT = /(^|&&|\|\||;|\|)\s*pi-bg-(wait|stop)\s+(bg|loop)?\d+\b/;
@@ -888,11 +889,38 @@ export default function (pi: ExtensionAPI) {
 				}
 				return { content: [{ type: "text", text: parts.join("\n\n") }], details: undefined as any };
 			}
-			if (MIXED_WAIT.test(rest.command ?? "")) {
+			// Text of the waits and stops lifted out of a mixed command, put before the rest's result.
+			let lead = "";
+			const mixed = MIXED_WAIT.test(rest.command ?? "") ? splitMixed(rest.command ?? "") : "plain";
+			if (!mixed || (monitor && mixed !== "plain")) {
 				throw new Error(
-					"pi-bg-wait and pi-bg-stop are answered by this tool, not by bash: send each as the whole command (`pi-bg-wait bg3`, or several joined with && and nothing else), and run other commands in a separate call.",
+					"pi-bg-wait and pi-bg-stop are answered by this tool, not by bash: they run first when joined to other commands with && or ;, but not after a pipe, || or &, in a subshell, in a monitor, or in a command with a heredoc. Send them as their own call, or joined with && or ;.",
 				);
 			}
+			if (mixed !== "plain") {
+				const parts: string[] = [];
+				for (const op of mixed.ops) {
+					let text: string;
+					try {
+						text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout) : stop(op.id);
+					} catch (e) {
+						text = e instanceof Error ? e.message : String(e);
+					}
+					parts.push(`== pi-bg-${op.kind} ${op.id}\n${text}`);
+				}
+				if (!mixed.rest) return { content: [{ type: "text", text: parts.join("\n\n") }], details: undefined as any };
+				lead = `${parts.join("\n\n")}\n\n== then: ${mixed.rest}\n`;
+				rest.command = mixed.rest;
+			}
+			const withLead = async (run: () => Promise<any>) => {
+				if (!lead) return run();
+				try {
+					const result = await run();
+					return { ...result, content: [{ type: "text", text: lead }, ...(result.content ?? [])] };
+				} catch (e) {
+					throw new Error(lead + (e instanceof Error ? e.message : String(e)));
+				}
+			};
 
 			if (monitor) {
 				if (child) throw new Error("monitor works in the main session only: a sub-agent's run ends before its events could arrive.");
@@ -926,7 +954,7 @@ export default function (pi: ExtensionAPI) {
 			// Plain stock bash for a main-session foreground command, and on Windows
 			// (process groups and the hand-off are POSIX).
 			if (process.platform === "win32" || (!child && !background)) {
-				return createBashToolDefinition(ctx.cwd, options).execute(toolCallId, rest, signal, onUpdate, ctx);
+				return withLead(() => createBashToolDefinition(ctx.cwd, options).execute(toolCallId, rest, signal, onUpdate, ctx));
 			}
 
 			const call: { background: boolean; autoMs: number; job?: Job; label?: string } = {
@@ -935,12 +963,14 @@ export default function (pi: ExtensionAPI) {
 				label: rest.command,
 			};
 			const tool = createBashToolDefinition(ctx.cwd, { ...options, operations: { exec: (command, cwd, o) => exec(call, command, cwd, o) } });
-			const result = await tool.execute(toolCallId, rest, signal, onUpdate, ctx);
-			if (!call.job) return result;
+			return withLead(async () => {
+				const result = await tool.execute(toolCallId, rest, signal, onUpdate, ctx);
+				if (!call.job) return result;
 
-			const notice = handOffNotice(call.job, call.background);
-			if (call.background) return { ...result, content: [{ type: "text", text: notice }] };
-			return { ...result, content: [...result.content, { type: "text", text: `\n${notice}` }] };
+				const notice = handOffNotice(call.job, call.background);
+				if (call.background) return { ...result, content: [{ type: "text", text: notice }] };
+				return { ...result, content: [...result.content, { type: "text", text: `\n${notice}` }] };
+			});
 		},
 	});
 }

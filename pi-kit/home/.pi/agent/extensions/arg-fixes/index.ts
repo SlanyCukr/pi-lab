@@ -5,7 +5,10 @@
  *    leave unset, and for a string-typed one it sometimes writes the text "null". pi-subagents
  *    then rejects `thinking: "null"` ("Invalid thinking level", by design) and would look for a
  *    model or session literally named "null"; the model retries without it, costing a turn.
- *    Seen 2026-09-22/23.
+ *    Seen 2026-09-22/23. The same habit hits `todo` and `lens_diagnostics` (run to 2026-10-11: 8 of
+ *    229 todo calls, 3 of them updates that renamed task 1 to "null" with description "null"; 7
+ *    lens calls with `path: "null"`). Only free-text fields are listed: pi validates arguments
+ *    before `tool_call`, so an enum field such as `status: "null"` fails there and never reaches us.
  *
  * 2. `\uXXXX` escapes in edit text. In non-ASCII files (Czech strings, typographic dashes) Opus
  *    writes `edits[].oldText` with the characters as literal six-character escapes (`Spojen\u00e9`
@@ -37,8 +40,22 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // tool -> optional string parameters where "null" / "undefined" / "" / "none" can only mean "not set"
 const FIELDS: Record<string, readonly string[]> = {
 	subagent: ["model", "thinking", "resume"],
+	todo: ["subject", "description", "activeForm"],
+	lens_diagnostics: ["path"],
 };
 const PLACEHOLDER = /^\s*(null|undefined|none|)\s*$/i;
+
+/** Deletes placeholder strings from the tool's optional free-text fields; returns how many. Exported for the test. */
+export function dropPlaceholders(toolName: string, input: any): number {
+	let dropped = 0;
+	for (const field of FIELDS[toolName] ?? []) {
+		if (typeof input?.[field] === "string" && PLACEHOLDER.test(input[field])) {
+			delete input[field];
+			dropped++;
+		}
+	}
+	return dropped;
+}
 
 const HAS_ESCAPE = /\\u[0-9a-fA-F]{4}/;
 const decode = (s: string) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
@@ -133,11 +150,7 @@ export default function (pi: ExtensionAPI) {
 			const reason = controlCharProblem(event.toolName, input, cwd);
 			return reason ? { block: true, reason } : undefined;
 		}
-		const fields = FIELDS[event?.toolName];
-		if (!fields) return undefined;
-		for (const field of fields) {
-			if (typeof input[field] === "string" && PLACEHOLDER.test(input[field])) delete input[field];
-		}
+		dropPlaceholders(event?.toolName, input);
 		return undefined;
 	});
 }

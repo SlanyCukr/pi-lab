@@ -1,5 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, fixEscapedEdits } from "./index.ts";
+import { controlCharProblem, dropPlaceholders, fixEscapedEdits } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -49,4 +49,15 @@ r = controlCharProblem("write", { path: "new.md", content: "done \u001b[0m" }, D
 ok(!!r && r.startsWith("write blocked: content") && r.includes("(escape)"), "write of a new file with ESC blocked");
 ok(controlCharProblem("write", { path: "new.md", content: "plain \u00e9\n" }, D) === undefined, "plain write passes");
 ok(controlCharProblem("edit", { path: "missing.py", edits: [{ oldText: "a\u0007", newText: "b" }] }, D)?.includes("U+0007") === true, "missing file: still blocked");
+// placeholders: the todo update seen 3 times in the loop renamed task 1 to "null"
+let p: any = { action: "update", id: 1, status: "completed", activeForm: "null", description: "null", subject: "null" };
+ok(dropPlaceholders("todo", p) === 3 && JSON.stringify(p) === '{"action":"update","id":1,"status":"completed"}', "todo update: null subject/description/activeForm dropped");
+p = { action: "create", subject: "Fix login", description: "None", activeForm: "fixing login" };
+ok(dropPlaceholders("todo", p) === 1 && p.subject === "Fix login" && p.activeForm === "fixing login" && !("description" in p), "todo create: real text kept");
+p = { source: "lsp", scope: "paths", paths: ["a.ts"], path: "null", mode: "full" };
+ok(dropPlaceholders("lens_diagnostics", p) === 1 && !("path" in p) && p.mode === "full", "lens_diagnostics: null path dropped");
+p = { subagent_type: "Explore", thinking: "undefined", model: "", prompt: "null" };
+ok(dropPlaceholders("subagent", p) === 2 && p.prompt === "null", "subagent: only listed fields");
+p = { path: "null", content: "null" };
+ok(dropPlaceholders("write", p) === 0 && p.path === "null", "other tools untouched");
 process.exit(fail);
