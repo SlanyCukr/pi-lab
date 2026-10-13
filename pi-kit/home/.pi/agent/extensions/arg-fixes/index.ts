@@ -25,7 +25,11 @@
  *    misleading "text not found" (often retried unchanged, up to 3 times), and 13 wrote the control
  *    characters into files (ledger, tests, source). Such a call is now blocked with a reason that
  *    names the character and the text before it, unless the file already contains that character.
- *    Tab, newline and carriage return are never blocked.
+ *    Tab, newline and carriage return are never blocked. One broken form is repaired instead: a
+ *    carriage return before `u` and four hex digits (`Zpr\ru00e1vy` for `Zprávy`, `\ru2265` for `≥`) is
+ *    the escape `\uXXXX` with its backslash eaten; to 2026-10-12, 11 edit calls had it, 9 failed as
+ *    "not found" and 2 wrote it into files. Only non-ASCII code points, and only when the file does
+ *    not already contain that exact sequence.
  *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
@@ -60,8 +64,11 @@ export function dropPlaceholders(toolName: string, input: any): number {
 const HAS_ESCAPE = /\\u[0-9a-fA-F]{4}/;
 const decode = (s: string) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
 // Escapes of non-ASCII characters not preceded by a backslash: the model's transport habit, not source syntax.
-const NON_ASCII_ESCAPE = /(?<!\\)\\u(00[89a-fA-F][0-9a-fA-F]|0[1-9a-fA-F][0-9a-fA-F]{2}|[1-9a-fA-F][0-9a-fA-F]{3})/g;
+const NON_ASCII_HEX = "(00[89a-fA-F][0-9a-fA-F]|0[1-9a-fA-F][0-9a-fA-F]{2}|[1-9a-fA-F][0-9a-fA-F]{3})";
+const NON_ASCII_ESCAPE = new RegExp(`(?<!\\\\)\\\\u${NON_ASCII_HEX}`, "g");
 const decodeNonAscii = (s: string) => s.replace(NON_ASCII_ESCAPE, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+// A `\uXXXX` escape whose backslash became a carriage return.
+const CR_ESCAPE = new RegExp(`\\ru${NON_ASCII_HEX}`, "g");
 
 // The same loosening pi's edit tool applies before it gives up (edit-diff.js normalizeForFuzzyMatch),
 // so "found" here means "the edit tool would find it".
@@ -109,6 +116,29 @@ export function fixEscapedEdits(input: any, cwd: string): number {
 	return fixed;
 }
 
+/** Repairs CR-broken escapes in edit/write text in place; returns how many fields changed. Exported for the test. */
+export function fixCrEscapes(toolName: string, input: any, cwd: string): number {
+	const slots: [any, string][] =
+		toolName === "write"
+			? [[input, "content"]]
+			: (Array.isArray(input?.edits) ? input.edits : [input]).flatMap((e: any) => [[e, "oldText"], [e, "newText"]] as [any, string][]);
+	let text: string | undefined | null = null; // null: not read yet
+	let fixed = 0;
+	for (const [obj, key] of slots) {
+		const value = obj?.[key];
+		if (typeof value !== "string" || !value.includes("\r")) continue;
+		const next = value.replace(CR_ESCAPE, (m: string, hex: string) => {
+			if (text === null) text = fileText(input?.path, cwd);
+			return text?.includes(m) ? m : String.fromCharCode(Number.parseInt(hex, 16));
+		});
+		if (next !== value) {
+			obj[key] = next;
+			fixed++;
+		}
+	}
+	return fixed;
+}
+
 // C0 controls except tab, newline and carriage return, plus DEL.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const NAMES: Record<string, string> = { "\b": "backspace", "\f": "form feed", "\v": "vertical tab", "\u0000": "NUL", "\u001B": "escape", "\u007F": "delete" };
@@ -146,6 +176,7 @@ export default function (pi: ExtensionAPI) {
 		if (!input || typeof input !== "object") return undefined;
 		if (event.toolName === "edit" || event.toolName === "write") {
 			const cwd = ctx?.cwd ?? process.cwd();
+			fixCrEscapes(event.toolName, input, cwd);
 			if (event.toolName === "edit") fixEscapedEdits(input, cwd);
 			const reason = controlCharProblem(event.toolName, input, cwd);
 			return reason ? { block: true, reason } : undefined;

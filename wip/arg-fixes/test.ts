@@ -1,5 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, dropPlaceholders, fixEscapedEdits } from "./index.ts";
+import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -49,6 +49,18 @@ r = controlCharProblem("write", { path: "new.md", content: "done \u001b[0m" }, D
 ok(!!r && r.startsWith("write blocked: content") && r.includes("(escape)"), "write of a new file with ESC blocked");
 ok(controlCharProblem("write", { path: "new.md", content: "plain \u00e9\n" }, D) === undefined, "plain write passes");
 ok(controlCharProblem("edit", { path: "missing.py", edits: [{ oldText: "a\u0007", newText: "b" }] }, D)?.includes("U+0007") === true, "missing file: still blocked");
+// 10 a carriage return that ate an escape's backslash (c212 verdicts3.json, README "\ru2265"): repaired, so the edit finds its text
+writeFileSync(`${D}/v.json`, '{"outlet": "Seznam Zpr\u00e1vy", "bar": "clean \u2265 18"}\r\n');
+i = { path: "v.json", edits: [{ oldText: '"Seznam Zpr\ru00e1vy"', newText: '"Seznam Zpr\ru00e1vy \u2014 web"' }, { oldText: "clean \ru2265 18\"}\r\n", newText: "x\r\n" }] };
+ok(fixCrEscapes("edit", i, D) === 3 && i.edits[0].oldText === '"Seznam Zprávy"' && i.edits[0].newText === '"Seznam Zprávy \u2014 web"' && i.edits[1].oldText === 'clean ≥ 18"}\r\n' && i.edits[1].newText === "x\r\n", "CR before uXXXX decoded in oldText and newText; CRLF kept");
+i = { path: "v.json", edits: [{ oldText: "a\ru0041", newText: "b\ru00e1" }] };
+ok(fixCrEscapes("edit", i, D) === 1 && i.edits[0].oldText === "a\ru0041" && i.edits[0].newText === "bá", "ASCII code point (\\ru0041) left alone");
+writeFileSync(`${D}/raw.txt`, "line\ru00e1 kept\n");
+i = { path: "raw.txt", edits: [{ oldText: "line\ru00e1 kept", newText: "line\ru00e1 two" }] };
+ok(fixCrEscapes("edit", i, D) === 0 && i.edits[0].newText === "line\ru00e1 two", "file already has the sequence: untouched");
+const w: any = { path: "new.md", content: "nap\ru0159. ok\r\n" };
+ok(fixCrEscapes("write", w, D) === 1 && w.content === "nap\u0159. ok\r\n", "write content of a new file repaired");
+ok(fixCrEscapes("edit", { path: "v.json", edits: [{ oldText: "plain", newText: "text" }] }, D) === 0, "no CR: nothing");
 // placeholders: the todo update seen 3 times in the loop renamed task 1 to "null"
 let p: any = { action: "update", id: 1, status: "completed", activeForm: "null", description: "null", subject: "null" };
 ok(dropPlaceholders("todo", p) === 3 && JSON.stringify(p) === '{"action":"update","id":1,"status":"completed"}', "todo update: null subject/description/activeForm dropped");
