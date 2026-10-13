@@ -19,3 +19,4 @@ node_modules/
 *.orig
 # Private agent instructions (host details); pi loads it instead of AGENTS.md
 AGENTS.override.md
+wip/pi-maint/
