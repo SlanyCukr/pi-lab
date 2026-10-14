@@ -5,11 +5,14 @@
  * Display, plus one execution rule. The model's context and the session file are untouched: whichever
  * of the built-in read/edit/write/grep/find/ls tools are active at session start, and still pi's
  * own (no other extension overrides them), are re-registered with pi's own definitions (stock
- * execute, prompt text and schema) plus renderers. The rule: `edit` and `write` are marked
+ * execute, prompt text and schema) plus renderers. The rule: `edit`, `write` and `read` are marked
  * `executionMode: "sequential"`, so a message that contains one runs its calls one after another in
  * the model's order. pi otherwise runs a message's calls at once, and a read or test beside an edit
  * of the same file saw it half-written (2026-10-07..09: 10 of 14 such reads failed with "Offset N is
- * beyond end of file (1 lines total)"). Messages without an edit or write still run in parallel.
+ * beyond end of file (1 lines total)"). `read` joined on 2026-10-14: a read beside the bash call that
+ * creates its file (a screenshot, a crop) ran first and failed with ENOENT, 103 times in the find-gaps
+ * run (21 in one day); only 26 of 2882 parallel messages with a read had two slow calls to serialize.
+ * Messages without an edit, write or read still run in parallel.
  * bg-bash routes `bash` rendering here; the two
  * find each other on the session's own event bus (`pi.events`), so sub-agent sessions and /reload
  * never cross wires.
@@ -500,7 +503,7 @@ export default function (pi: ExtensionAPI) {
 			const base = make(toolCwd, toolOptions(name));
 			pi.registerTool({
 				...base,
-				...(name === "edit" || name === "write" ? { executionMode: "sequential" } : {}),
+				...(name === "edit" || name === "write" || name === "read" ? { executionMode: "sequential" } : {}),
 				renderShell: "self",
 				execute: (toolCallId: string, params: any, signal: any, onUpdate: any, ctx: any) =>
 					make(ctx.cwd, toolOptions(name)).execute(toolCallId, params, signal, onUpdate, ctx),
