@@ -28,7 +28,9 @@
       "~/.ssh": "deny",
       "~/.ssh/*": "deny",
       "~/.pi/agent/auth.json": "deny",
-      "~/.codex/auth.json": "deny"
+      "~/.codex/auth.json": "deny",
+      // full pi-maint key (production writes): only ~/bin/pi-maint uses it, from the interactive session
+      "~/.config/pi-maint/id_ed25519": "deny"
     }
   }
 }
