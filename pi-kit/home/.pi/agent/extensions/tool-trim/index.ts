@@ -15,7 +15,11 @@
  * Unknown tools and unknown parameters pass through untouched.
  *
  * Handles Anthropic (`tools[].input_schema`), OpenAI chat (`tools[].function.parameters`)
- * and OpenAI responses (`tools[].parameters`) shapes. Env: PI_TOOL_TRIM=0 turns it off.
+ * and OpenAI responses (`tools[].parameters`) shapes. The system text sits in `system`
+ * (Anthropic), `instructions` (Codex), `messages[0]` (chat) or `input[0]` (OpenAI responses,
+ * role developer: every `openai/*` session; untrimmed until 2026-10-15, when all 42 runner
+ * reviews of a day ran `ast-grep` from the pi-lens skill and 20 of those calls failed).
+ * Env: PI_TOOL_TRIM=0 turns it off.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -216,15 +220,17 @@ const trimSystem = (payload: Json): Json => {
 	}
 	if (typeof payload.system === "string") return { ...payload, system: trimSystemText(payload.system) };
 	if (typeof payload.instructions === "string") return { ...payload, instructions: trimSystemText(payload.instructions) };
-	const first = payload.messages?.[0];
-	if (first && (first.role === "system" || first.role === "developer")) {
+	for (const key of ["messages", "input"]) {
+		const list = payload[key];
+		const first = Array.isArray(list) ? list[0] : undefined;
+		if (!first || (first.role !== "system" && first.role !== "developer")) continue;
 		const content =
 			typeof first.content === "string"
 				? trimSystemText(first.content)
 				: Array.isArray(first.content)
 					? first.content.map((c: Json) => (typeof c?.text === "string" ? { ...c, text: trimSystemText(c.text) } : c))
 					: first.content;
-		return { ...payload, messages: [{ ...first, content }, ...payload.messages.slice(1)] };
+		return { ...payload, [key]: [{ ...first, content }, ...list.slice(1)] };
 	}
 	return payload;
 };
