@@ -15,7 +15,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { ensureUserTailForAdvisor, stripInflightAdvisorCall } from "./context.js";
+import { ensureUserTailForAdvisor, stripInflightAdvisorCall, stripToolDeclarations } from "./context.js";
 import { getInventoryMessage } from "./inventory.js";
 import {
 	ERR_ABORTED_DETAIL,
@@ -124,7 +124,9 @@ export async function executeAdvisor(
 		ctx.sessionManager.getEntries(),
 		ctx.sessionManager.getLeafId(),
 	);
-	const branchMessages = ensureUserTailForAdvisor(stripInflightAdvisorCall(convertToLlm(sessionMessages)));
+	const branchMessages = ensureUserTailForAdvisor(
+		stripInflightAdvisorCall(stripToolDeclarations(convertToLlm(sessionMessages))),
+	);
 	const inventoryMessage = getInventoryMessage(pi.getAllTools());
 	const messages: Message[] = inventoryMessage ? [inventoryMessage, ...branchMessages] : branchMessages;
 
@@ -141,6 +143,7 @@ export async function executeAdvisor(
 		// to this path: explicit overrides would bypass that resolution and
 		// reintroduce the endpoint mismatch.
 		const completeSimple = runtimeCompleteSimple ?? (await loadCompleteSimple());
+		// Local fix (rpiv-mono#236): a stable per-session id lets the advisor's prompt cache hit.
 		const advisorSessionId = `advisor-${ctx.sessionManager.getSessionId()}`;
 		const requestOptions = runtimeCompleteSimple
 			? { signal, reasoning: effort, sessionId: advisorSessionId }
@@ -148,8 +151,8 @@ export async function executeAdvisor(
 
 		// Single dispatch point — both attempts reuse the SAME `messages` and
 		// `requestOptions`, so the retry cannot diverge from attempt 1. `tools: []`
-		// reaffirms the "never calls tools" contract even when `messages` contains
-		// prior toolCall/toolResult blocks (btw.ts:235).
+		// plus stripToolDeclarations keeps the "never calls tools" contract: on
+		// Pi >= 1.0 the transcript's system messages declare tools of their own.
 		const callAdvisor = (): Promise<AssistantMessage> =>
 			completeSimple(advisor, { systemPrompt: ADVISOR_SYSTEM_PROMPT, messages, tools: [] }, requestOptions);
 

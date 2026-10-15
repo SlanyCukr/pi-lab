@@ -1,0 +1,17 @@
+{
+  "name": "pi-extensions",
+  "private": true,
+  "dependencies": {
+    "@gotgenes/pi-anthropic-auth": "^3.2.2",
+    "@gotgenes/pi-subagents": "^21.7.6",
+    "@juicesharp/rpiv-todo": "^2.11.0",
+    "pi-lens": "^4.2.1",
+    "pi-web-access": "^0.30.0"
+  },
+  "allowScripts": {
+    "@ast-grep/cli": true,
+    "esbuild": true,
+    "@google/genai": false,
+    "protobufjs": false
+  }
+}

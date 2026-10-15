@@ -1,0 +1,128 @@
+diff -ruN -x node_modules -x package-lock.json /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/context.ts fixes/rpiv-advisor-2.13.8-local/advisor/context.ts
+--- /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/context.ts	1985-10-26 09:15:00.000000000 +0100
++++ fixes/rpiv-advisor-2.13.8-local/advisor/context.ts	1985-10-26 09:15:00.000000000 +0100
+@@ -2,7 +2,8 @@
+  * context — branch-message massaging for the advisor side-call. Strips the
+  * executor's in-flight advisor() toolCall from the tail (orphan toolCalls are
+  * rejected by providers) and guarantees a user-role tail (some providers reject
+- * an assistant-prefill tail).
++ * an assistant-prefill tail), and drops the executor's callable tool
++ * declarations from copied system messages.
+  */
+ 
+ import type { Message } from "@earendil-works/pi-ai";
+@@ -38,3 +39,18 @@
+ 	};
+ 	return [...messages, nudge];
+ }
++
++// Pi >= 1.0 records the executor's system prompt and tool loadout in the
++// transcript as `system` messages, and every provider resolves the request's
++// tools from those `toolsAdded`/`toolsRemoved` deltas — so `tools: []` alone
++// leaves the executor's tools callable and the advisor can stop on `toolUse`
++// with no text (#295). Drop the deltas, keep the prompt text; the inventory
++// message already tells the advisor what the executor's tools are.
++export function stripToolDeclarations(messages: Message[]): Message[] {
++	if (!messages.some((m) => m.role === "system" && (m.toolsAdded || m.toolsRemoved))) return messages;
++	return messages.map((m) => {
++		if (m.role !== "system" || (!m.toolsAdded && !m.toolsRemoved)) return m;
++		const { toolsAdded: _added, toolsRemoved: _removed, ...rest } = m;
++		return rest;
++	});
++}
+diff -ruN -x node_modules -x package-lock.json /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/execute.ts fixes/rpiv-advisor-2.13.8-local/advisor/execute.ts
+--- /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/execute.ts	2026-09-17 19:55:20.000000000 +0200
++++ fixes/rpiv-advisor-2.13.8-local/advisor/execute.ts	2026-10-15 17:15:09.996341842 +0200
+@@ -15,7 +15,7 @@
+ 	type ExtensionAPI,
+ 	type ExtensionContext,
+ } from "@earendil-works/pi-coding-agent";
+-import { ensureUserTailForAdvisor, stripInflightAdvisorCall } from "./context.js";
++import { ensureUserTailForAdvisor, stripInflightAdvisorCall, stripToolDeclarations } from "./context.js";
+ import { getInventoryMessage } from "./inventory.js";
+ import {
+ 	ERR_ABORTED_DETAIL,
+@@ -124,7 +124,9 @@
+ 		ctx.sessionManager.getEntries(),
+ 		ctx.sessionManager.getLeafId(),
+ 	);
+-	const branchMessages = ensureUserTailForAdvisor(stripInflightAdvisorCall(convertToLlm(sessionMessages)));
++	const branchMessages = ensureUserTailForAdvisor(
++		stripInflightAdvisorCall(stripToolDeclarations(convertToLlm(sessionMessages))),
++	);
+ 	const inventoryMessage = getInventoryMessage(pi.getAllTools());
+ 	const messages: Message[] = inventoryMessage ? [inventoryMessage, ...branchMessages] : branchMessages;
+ 
+@@ -141,6 +143,7 @@
+ 		// to this path: explicit overrides would bypass that resolution and
+ 		// reintroduce the endpoint mismatch.
+ 		const completeSimple = runtimeCompleteSimple ?? (await loadCompleteSimple());
++		// Local fix (rpiv-mono#236): a stable per-session id lets the advisor's prompt cache hit.
+ 		const advisorSessionId = `advisor-${ctx.sessionManager.getSessionId()}`;
+ 		const requestOptions = runtimeCompleteSimple
+ 			? { signal, reasoning: effort, sessionId: advisorSessionId }
+@@ -148,8 +151,8 @@
+ 
+ 		// Single dispatch point — both attempts reuse the SAME `messages` and
+ 		// `requestOptions`, so the retry cannot diverge from attempt 1. `tools: []`
+-		// reaffirms the "never calls tools" contract even when `messages` contains
+-		// prior toolCall/toolResult blocks (btw.ts:235).
++		// plus stripToolDeclarations keeps the "never calls tools" contract: on
++		// Pi >= 1.0 the transcript's system messages declare tools of their own.
+ 		const callAdvisor = (): Promise<AssistantMessage> =>
+ 			completeSimple(advisor, { systemPrompt: ADVISOR_SYSTEM_PROMPT, messages, tools: [] }, requestOptions);
+ 
+diff -ruN -x node_modules -x package-lock.json /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/index.ts fixes/rpiv-advisor-2.13.8-local/advisor/index.ts
+--- /home/loop/.pi/agent/local-packages/rpiv-advisor/advisor/index.ts	1985-10-26 09:15:00.000000000 +0100
++++ fixes/rpiv-advisor-2.13.8-local/advisor/index.ts	1985-10-26 09:15:00.000000000 +0100
+@@ -25,7 +25,7 @@
+ 
+ export { registerAdvisorCommand } from "./command.js";
+ export { loadAdvisorConfig, saveAdvisorConfig } from "./config.js";
+-export { ensureUserTailForAdvisor, stripInflightAdvisorCall } from "./context.js";
++export { ensureUserTailForAdvisor, stripInflightAdvisorCall, stripToolDeclarations } from "./context.js";
+ export {
+ 	registerAdvisorBeforeAgentStart,
+ 	registerModelSelectHandler,
+diff -ruN -x node_modules -x package-lock.json /home/loop/.pi/agent/local-packages/rpiv-advisor/docs/tool-reference.md fixes/rpiv-advisor-2.13.8-local/docs/tool-reference.md
+--- /home/loop/.pi/agent/local-packages/rpiv-advisor/docs/tool-reference.md	1985-10-26 09:15:00.000000000 +0100
++++ fixes/rpiv-advisor-2.13.8-local/docs/tool-reference.md	1985-10-26 09:15:00.000000000 +0100
+@@ -32,8 +32,9 @@
+    non-user tails accept the payload.
+ 
+ The reviewer is invoked with the advisor system prompt, `tools: []`, and the
+-configured reasoning effort. It never calls tools and never writes to your
+-transcript — its answer comes back only as the tool result the executor reads.
++configured reasoning effort. The executor's tool declarations are removed from
++the copied context, so the reviewer has no tools to call. It never calls tools
++and never writes to your transcript — its answer comes back only as the tool result the executor reads.
+ The default prompt guidelines direct the executor to restate the advisor's key
+ guidance in its next visible reply, so the guidance is not left only in a
+ collapsed tool card.
+diff -ruN -x node_modules -x package-lock.json /home/loop/.pi/agent/local-packages/rpiv-advisor/package.json fixes/rpiv-advisor-2.13.8-local/package.json
+--- /home/loop/.pi/agent/local-packages/rpiv-advisor/package.json	2026-09-23 10:17:40.000000000 +0200
++++ fixes/rpiv-advisor-2.13.8-local/package.json	1985-10-26 09:15:00.000000000 +0100
+@@ -1,6 +1,6 @@
+ {
+ 	"name": "@juicesharp/rpiv-advisor",
+-	"version": "2.11.0",
++	"version": "2.13.8",
+ 	"description": "Pi extension. A second opinion the model can request from a stronger reviewer model before it acts.",
+ 	"keywords": [
+ 		"pi-package",
+@@ -47,12 +47,12 @@
+ 		]
+ 	},
+ 	"dependencies": {
+-		"@juicesharp/rpiv-config": "^2.11.0",
+-		"typebox": "^1.1.24"
++		"@juicesharp/rpiv-config": "^2.13.8"
+ 	},
+ 	"peerDependencies": {
+ 		"@earendil-works/pi-ai": "*",
+ 		"@earendil-works/pi-coding-agent": "*",
+-		"@earendil-works/pi-tui": "*"
++		"@earendil-works/pi-tui": "*",
++		"typebox": "*"
+ 	}
+ }

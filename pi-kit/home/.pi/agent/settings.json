@@ -7,7 +7,7 @@
   "shellCommandPrefix": "unset NODE_ENV",
   "packages": [
     "npm:pi-web-access",
-    "local-packages/pi-permission-system-33.0.8",
+    "npm:@gotgenes/pi-permission-system",
     "npm:pi-lens",
     "local-packages/rpiv-advisor",
     "npm:@gotgenes/pi-subagents",

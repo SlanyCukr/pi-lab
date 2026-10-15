@@ -1,0 +1,20 @@
+--- /home/loop/.pi/agent/extensions/pi-permission-system/config.json	2026-10-14 09:36:33.103614523 +0200
++++ fixes/pi-permission-system-40/config.json	2026-10-15 18:08:48.117714450 +0200
+@@ -19,7 +19,16 @@
+       "rm -rf /tmp/*": "allow",
+       "rm -rf /tmp/* /*": "deny",
+       "rm -rf /tmp/* ~*": "deny",
+-      "rm -rf ~*": "deny"
++      "rm -rf ~*": "deny",
++      // pi-permission-system >= 40 also matches the absolute spelling of a relative path, so
++      // `cd <repo> && rm -rf ./dist` now hits "rm -rf /*". Re-allow the work trees (absolute or relative).
++      // Same shape as the /tmp rules: one target at a time, so a second path re-denies.
++      "rm -rf /home/loop/projects/*/*": "allow",
++      "rm -rf /home/loop/pi-lab/*": "allow",
++      "rm -rf /home/loop/projects/*/* /*": "deny",
++      "rm -rf /home/loop/projects/*/* ~*": "deny",
++      "rm -rf /home/loop/pi-lab/* /*": "deny",
++      "rm -rf /home/loop/pi-lab/* ~*": "deny"
+     },
+     "path": {
+       "*.env": "deny",

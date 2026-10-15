@@ -1,0 +1,21 @@
+--- /home/loop/.pi/agent/settings.json	2026-10-04 20:35:35.000000000 +0200
++++ /tmp/pi-update/env/agent-v40/settings.json	2026-10-15 17:13:03.264261702 +0200
+@@ -7,7 +7,7 @@
+   "shellCommandPrefix": "unset NODE_ENV",
+   "packages": [
+     "npm:pi-web-access",
+-    "local-packages/pi-permission-system-33.0.8",
++    "npm:@gotgenes/pi-permission-system",
+     "npm:pi-lens",
+     "local-packages/rpiv-advisor",
+     "npm:@gotgenes/pi-subagents",
+@@ -27,5 +27,6 @@
+     "baseDelayMs": 3000
+   },
+   "theme": "dark",
+-  "defaultProjectTrust": "always"
+-}
++  "defaultProjectTrust": "always",
++  "lastChangelogVersion": "1.2.0"
++}
+\ No newline at end of file
