@@ -20,8 +20,20 @@
  * 6 of 7 bg-bash wake-ups missed the cache, about $2 each at 250K context.
  * Fix: remember the system prompt of the last hooked run and reuse it in an unhooked run,
  * but only when the tool list is the same. Env: PI_PROMPT_PIN=0 turns the pin off.
+ *
+ * One system head per request (2026-10-16). pi 1.2.0 keeps a tool change (web_enable) as a
+ * system message in mid-conversation. When a legacy `context` handler returns a new list
+ * (pi-lens does, on turns with findings), pi rebuilds the request as `[getCurrentSystemMessage(),
+ * ...returned]`: a merged head, with the mid-conversation message gone. On other turns the original
+ * head and that message stay. So each pi-lens turn flips the system prompt and the tools, and
+ * Anthropic drops every earlier thinking block (`prefix_binding_mismatch`) and re-writes the cache
+ * from the head: cycle 275 paid $44 of avoidable cache writes that way in 36 of 156 turns. Fix:
+ * always send the merged form. A session without a tool or prompt change is unchanged; in a real
+ * pi-lens run with one, head changes went 14 -> 0, misses 9 -> 5 (all in the first few turns after
+ * the change) and cache writes -45 %. Env: PI_SYSTEM_FOLD=0 turns it off.
  */
 
+import { getCurrentSystemMessage } from "@earendil-works/pi-ai";
 import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -144,6 +156,21 @@ export default function (pi: ExtensionAPI) {
 			if (process.env.PI_CACHE_TTL_DEBUG) console.error(`[cache-ttl] divergence log failed: ${err}`);
 		}
 	};
+
+	// --- one system head per request (see the header) ---------------------------------------
+	// `context_with_system` runs after every `context` handler, so it sees both shapes: the original
+	// (initial system message plus later ones) and pi's rebuild after a handler returned messages
+	// (one merged head). Both become the merged head; a lone leading system message is left as is.
+	const FOLD = process.env.PI_SYSTEM_FOLD !== "0";
+	pi.on("context_with_system", (event: any) => {
+		const messages = event?.messages;
+		if (!FOLD || !Array.isArray(messages)) return undefined;
+		const systemAt = messages.flatMap((m: any, i: number) => (m?.role === "system" ? [i] : []));
+		if (systemAt.length === 0 || (systemAt.length === 1 && systemAt[0] === 0)) return undefined;
+		const head = getCurrentSystemMessage(messages);
+		if (!head) return undefined;
+		return { messages: [head, ...messages.filter((m: any) => m?.role !== "system")] };
+	});
 
 	pi.on("before_provider_request", (event: any) => {
 		const pinnedPayload = pinSystemPrompt(event.payload);
