@@ -12,7 +12,7 @@ OUT="$KIT/home"
 A="$HOME/.pi/agent"
 
 rm -rf "$OUT"
-mkdir -p "$OUT/.pi/agent/agents" "$OUT/.pi/agent/extensions" "$OUT/.pi/agent/npm" \
+mkdir -p "$OUT/.pi/agent/agents" "$OUT/.pi/agent/prompts" "$OUT/.pi/agent/extensions" "$OUT/.pi/agent/npm" \
   "$OUT/.pi/agent/local-packages" "$OUT/.config/rpiv-advisor" "$OUT/.config/rpiv-todo" \
   "$OUT/.pi-lens" "$OUT/.agents/skills"
 
@@ -30,6 +30,8 @@ sub() {
 # System-prompt append and sub-agents
 sub < "$A/APPEND_SYSTEM.md" > "$OUT/.pi/agent/APPEND_SYSTEM.md"
 for f in "$A"/agents/*.md; do sub < "$f" > "$OUT/.pi/agent/agents/$(basename "$f")"; done
+# Prompt templates (/name commands)
+for f in "$A"/prompts/*.md; do [ -e "$f" ] && sub < "$f" > "$OUT/.pi/agent/prompts/$(basename "$f")"; done
 
 # Own extensions (source only)
 for d in arg-fixes auto-continue bg-bash cache-ttl compact-at hide-tools model-check tool-groups tool-trim; do
