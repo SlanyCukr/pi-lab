@@ -48,7 +48,9 @@ const TTL = process.env.PI_CACHE_TTL_MAIN ?? "1h";
 // (system, tools, or message index) so a miss can be told apart from a server-side
 // eviction. Hashes and 80-char snippets only. PI_CACHE_DIVERGENCE_LOG=0 turns it off.
 const DIVERGENCE_LOG = join(dirname(fileURLToPath(import.meta.url)), "divergence.jsonl");
-const hash = (value: unknown): string => createHash("sha1").update(JSON.stringify(value)).digest("hex").slice(0, 12);
+// JSON.stringify(undefined) is undefined (a run with --no-tools has no tool list), which update() rejects.
+const hash = (value: unknown): string =>
+	createHash("sha1").update(JSON.stringify(value) ?? "undefined").digest("hex").slice(0, 12);
 // Breakpoints move to the newest message every turn; they are not part of the content.
 const withoutCacheControl = (message: any): any =>
 	Array.isArray(message?.content)
