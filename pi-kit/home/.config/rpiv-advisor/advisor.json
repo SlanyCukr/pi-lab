@@ -1,5 +1,5 @@
 {
-  "modelKey": "{{SUB_PROVIDER}}/gpt-6-astra",
+  "modelKey": "anthropic/claude-fable-5-1",
   "effort": "high",
   "guidance": {
     "promptSnippet": "Escalate to a stronger reviewer model when stuck or before a consequential decision",
