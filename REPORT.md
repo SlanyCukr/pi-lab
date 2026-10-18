@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-18 — Critical review → the user's pick (site mainly for them): runner deploys at most every 8 h (`FG_PUSH_GAP`, red fixes and final push exempt) and hands projects/`doing` findings to the user every 15 commits (`project-check`); SKILL: `Audience: owner` weights (data × 1.5, polish × 0.5), browser spec count may not grow, eval data to release assets; loop asked for a visit counter, a spec-count CI guard, eval data out of the tree. Also fixed `producer | grep -q` under pipefail (random misses: red-fix push check, CI net-failure check; the ~1-in-10 stub flake) + static guard.
 - 2026-10-18 — Off GPT (the user): reviewer (loop gate, skeptic, done-check) → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`; both on the Claude subscription. Reviews since 10-17 ≈ $184 API-equivalent on Fable vs $183 for cycles; tested: Fable failed a planted bug in 31 s via `run_reviewer`.
 - 2026-10-18 — find-gaps: reviewer stderr lines in runner.log timestamped; SKILL: `explore-glm` lenses at most 2 at a time (z.ai plan shared with production, which saw 2 transient 429s during c307's GLM trials). No GLM fallback reviewer: limits delay only deploys (~12 h on 10-17), cycles keep working.
 - 2026-10-18 — Harness review: the rest after a failed part stays pending (push 92 had shipped 96 unreviewed commits); `FG_EXIT_GRACE` 120 → 45 s. `reviews/2026-10-18.md`
