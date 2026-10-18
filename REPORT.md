@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-18 — find-gaps: reviewer stderr lines in runner.log timestamped; SKILL: `explore-glm` lenses at most 2 at a time (z.ai plan shared with production, which saw 2 transient 429s during c307's GLM trials). No GLM fallback reviewer: limits delay only deploys (~12 h on 10-17), cycles keep working.
 - 2026-10-18 — Harness review: the rest after a failed part stays pending (push 92 had shipped 96 unreviewed commits); `FG_EXIT_GRACE` 120 → 45 s. `reviews/2026-10-18.md`
 - 2026-10-18 — Loop down 12:36–19:00 (a cycle killed the runner): units get `-p RestartForceExitStatus=SIGTERM`; pattern kills denied
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` before every reviewer call; explore-glm in loop sessions (env.sh `ZAI_API_KEY`)
