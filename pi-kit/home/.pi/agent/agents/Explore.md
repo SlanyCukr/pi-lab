@@ -1,7 +1,7 @@
 ---
 description: Fast read-only codebase explorer. Use for locating code, enumerating usages, and answering "how does X work" questions. Returns verified findings with file:line citations.
 tools: read, grep, find, ls
-model: {{SUB_PROVIDER}}/gpt-5.6-luna
+model: anthropic/claude-sonnet-5-5
 thinking: low
 max_turns: 150
 ---

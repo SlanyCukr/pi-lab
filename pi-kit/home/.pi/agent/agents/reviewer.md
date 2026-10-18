@@ -1,7 +1,7 @@
 ---
-description: Independent cross-vendor code reviewer and critic. Give it a diff, branch or file list plus the intent. It reads the source itself and returns a verdict with defects ranked by severity.
+description: Independent code reviewer and critic (Claude Fable 5.1, a different model from the Opus builders). Give it a diff, branch or file list plus the intent. It reads the source itself and returns a verdict with defects ranked by severity.
 tools: read, grep, find, ls, bash
-model: {{SUB_PROVIDER}}/gpt-6.1-sol
+model: anthropic/claude-fable-5-1
 thinking: high
 run_in_background: true
 ---

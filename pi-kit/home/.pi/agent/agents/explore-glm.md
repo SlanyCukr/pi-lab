@@ -1,5 +1,5 @@
 ---
-description: Read-only codebase explorer on the Z.AI coding plan. Same job as Explore; use it instead of Explore when {{SUB_PLAN}} is rate-limited.
+description: Read-only codebase explorer on the Z.AI coding plan. Same job as Explore; use it instead of Explore when Anthropic is rate-limited.
 tools: read, grep, find, ls
 model: zai/glm-5.3
 thinking: low

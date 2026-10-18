@@ -6,14 +6,14 @@ Log of the user's pi setup: what is installed, why, and what was tried.
 
 This section is the source of truth; the sections below explain how it got here.
 
-**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore and the reviewer run on `openai/*` (pi stores the ChatGPT login as `openai`), the advisor on `anthropic/claude-fable-5-1` (2026-10-17); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18), elsewhere `explore-glm` is off; no local Gemma, no desktop notifications. ImageMagick 7 (trixie debs unpacked without root) is in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (needed by the runner's screenshots and the stub tests). See `AGENTS.md` "This copy".
+**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore runs on `anthropic/claude-sonnet-5-5`, the reviewer and the advisor on `anthropic/claude-fable-5-1` (2026-10-18, the user: off GPT; no ChatGPT use left); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18), elsewhere `explore-glm` is off; no local Gemma, no desktop notifications. ImageMagick 7 (trixie debs unpacked without root) is in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (needed by the runner's screenshots and the stub tests). See `AGENTS.md` "This copy".
 
 | Role | How it is wired |
 |---|---|
 | Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.2 (no version pin; see AGENTS.md) |
-| Explorer sub-agent `Explore` | `openai-codex/gpt-5.6-luna`, thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
+| Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
-| Reviewer sub-agent `reviewer` | `openai/gpt-6.1-sol`, thinking high, read/grep/find/ls/bash |
+| Reviewer sub-agent `reviewer` | `anthropic/claude-fable-5-1` (2026-10-18; was `openai/gpt-6.1-sol`), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
 | Builder sub-agent `builder` | `anthropic/claude-opus-5-5`, thinking medium, edit tools + pi-lens diagnostics/LSP |
 | Advisor tool | `anthropic/claude-fable-5-1` (Claude subscription), effort high, `~/.config/rpiv-advisor/advisor.json` |
 
@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-18 — Off GPT (the user): reviewer (loop gate, skeptic, done-check) → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`; both on the Claude subscription. Reviews since 10-17 ≈ $184 API-equivalent on Fable vs $183 for cycles; tested: Fable failed a planted bug in 31 s via `run_reviewer`.
 - 2026-10-18 — find-gaps: reviewer stderr lines in runner.log timestamped; SKILL: `explore-glm` lenses at most 2 at a time (z.ai plan shared with production, which saw 2 transient 429s during c307's GLM trials). No GLM fallback reviewer: limits delay only deploys (~12 h on 10-17), cycles keep working.
 - 2026-10-18 — Harness review: the rest after a failed part stays pending (push 92 had shipped 96 unreviewed commits); `FG_EXIT_GRACE` 120 → 45 s. `reviews/2026-10-18.md`
 - 2026-10-18 — Loop down 12:36–19:00 (a cycle killed the runner): units get `-p RestartForceExitStatus=SIGTERM`; pattern kills denied
