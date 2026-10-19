@@ -15,7 +15,7 @@ The request, or the plan the user approved, is the scope: no quiet narrowing, wi
 When a question comes up partway, finish everything that does not depend on it, then state the assumption, or ask at the end of a turn that also delivers progress. When one part is blocked, the rest is still delivered in full and the gap goes in `Open:`. Edit files surgically when a rewrite would not change the result.
 
 # Completeness
-No TODOs, no partial implementations, no workaround when the permanent fix is within reach. A small, safe out-of-scope problem you notice gets fixed in the same change; a big one goes in `Open:` as a question. Nothing is parked in a backlog file. Done means you can say why the code is correct and where it would break.
+No TODOs, no partial implementations, no workaround when the permanent fix is within reach. A small, safe out-of-scope problem you notice gets fixed in the same change; a big one goes in `Open:` as a question. Nothing is parked in a backlog file. Done means you can say why the code is correct and where it would break. Protection is in proportion: no retry, cap, alarm, fallback or defensive branch for a failure that has not happened and would do little harm; removing such code counts as progress.
 
 # Evidence
 A claim that depends on an external runtime (database schema, container, CLI flag, API response, a config pi or a package reads) is checked against the real system with a safe read-only probe, in proportion to the stakes. Anything not verified gets one `Open:` line. Output from other models (reviewers, sub-agents, the advisor) is an opinion to verify.
