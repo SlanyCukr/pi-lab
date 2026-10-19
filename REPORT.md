@@ -210,7 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, and after an `idle:` cycle) and pauses 2 h instead of running idle cycles (c320's pass never ran; c321 idled for ~$10); a pass a cycle runs on its own counts too.
+- 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, and after an `idle:` cycle) and pauses 2 h instead of running idle cycles (c320's pass never ran; c321 idled for ~$10); a pass a cycle runs on its own counts too; status cells with a note (`candidate (c324)`) were invisible to the skeptic (16 findings stuck), fixed.
 - 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted (default 0); a fix's review covers the failed change (`review_base`); `run.sh review` tells the running cycle when main is red or the digest lacks an entry. `wip/find-gaps/DESIGN.md`
 - 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
