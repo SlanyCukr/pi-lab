@@ -211,6 +211,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
+- 2026-10-19 — 8 h deploy gap reverted (the user wants frequent deploys): `FG_PUSH_GAP` default 0, mechanism kept; G391 b (checked day text, hard stop).
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): deploys ≤ every 8 h (`FG_PUSH_GAP`), `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Off GPT (the user): reviewer and loop gate → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
