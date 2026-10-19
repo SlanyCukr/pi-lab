@@ -210,11 +210,9 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-19 — A red main that starts mid-cycle reaches the running cycle: `run.sh review` prints main-red-direct at the top (logged once per red commit), so the fix ships within the cycle instead of after it (dd03a16d went red 12 min into c317).
-- 2026-10-19 — Deploys after a failed review: `run.sh review` of a fix starts at the failed change (`review_base`, from review-state), and a pass clears review-failed, so both ship during the cycle (51 reviewed commits had waited for the cycle end). G393 a sent (contested = stance only).
+- 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted (default 0); a fix's review covers the failed change (`review_base`); `run.sh review` tells the running cycle when main is red. `wip/find-gaps/DESIGN.md`
 - 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
-- 2026-10-19 — 8 h deploy gap reverted (the user wants frequent deploys): `FG_PUSH_GAP` default 0, mechanism kept; G391 b (checked day text, hard stop).
-- 2026-10-18 — Critical review; the user's pick (site mainly for them): deploys ≤ every 8 h (`FG_PUSH_GAP`), `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
+- 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Off GPT (the user): reviewer and loop gate → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
@@ -242,14 +240,8 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-05 — Public repo `SlanyCukr/pi-lab`; find-gaps: OOM-proof units, affected suites only, `hold-push`; G180 backfills (echo24 codes 1264; bylines 709 + 3006)
 - 2026-10-04 — Pi loop check; auto-continue stops on prices; stale PRs riot-api-project#9, security-money-maker#2 closed; 45 min review grace; ImageMagick on the Pi
 - 2026-09-24 — Lean append (A/B −26 %/task); `/loop` tools hidden; pi-lens style rules off; Guidelines 3.6K → 2.2K
-- 2026-09-23 — `rpiv-ask-user-question` removed; `tool-trim` (tool defs 24.7K → 13.1K); ADHD rule 1 "lead with the outcome"
-- 2026-09-23 — Token pass (prompt pin, built-in sub-agents off, `analyze.py`); pi-goal removed; `web_search` allowlist; output-length pass
-- 2026-09-23 — `pi-kit` + Docker test; `arg-fixes`; monitor + `/loop` in bg-bash; npm `allowScripts`, advisor 2.11.0
-- 2026-09-23 — Updates: pi 0.87.1, auth 3.2.2 (pin removed), permission-system 33.0.8; `NODE_ENV` fix; `rm` rules; SoL-Pi not installed
-- 2026-09-22 — Delegation audit, model-role and explorer tests; no changes
-- 2026-09-22 — Default model Opus 5.5; pi-web installed and published
-- 2026-09-22 — Tool list sent twice: pi-subagents 21.7.6, local #962 patch
-- 2026-09-22 — Opus 5.5 tuning: append edits, effort A/B, builder on Opus 5.5, Explore rule, GPT-6 Luna tried and reverted
+- 2026-09-23 — Token and tool pass (tool defs 24.7K → 13.1K, lean append, `pi-kit`, `arg-fixes`, bg-bash monitor); updates pi 0.87.1, auth 3.2.2; pi-goal and ask-user removed
+- 2026-09-22 — Default model Opus 5.5 and its tuning; pi-web published; pi-subagents tool-list fix (#962); delegation audit
 - 2026-09-21 — `tool-groups` extension; pi-lens widget hidden
 - 2026-09-20 — `bg-bash`, `cache-ttl`, `compact-at`, `rpiv-todo`; `edit`-not-bash rule; instruction boundary; auto-retry raised
 - 2026-09-18 — `@gotgenes/pi-subagents` and `pi-anthropic-auth`; ADHD append; `pi-goal`, `hide-tools`; advisor over-calling fixed
