@@ -171,7 +171,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ### bg-bash, monitor, loop
 - **Own `bg-bash`** (2026-09-20): `background: true` on stock `bash`, no new tools (one session had polled CI 137 min). Monitor + `/loop` (09-23) as `bash` parameters stay under the permission rules (`wip/bg-bash/DESIGN-monitor-loop.md`).
-- **Rejected** (09-20/23): `pi-background-bash` (in children, login shell, skips shell prefix, rewrites transcript); `@richardgill/pi-background-bash`, `pi-patty-bg-tasks` (replace `bash` or 4+ tools); `clankercode/pi-monitor`, `codesoda/pi-event-monitor`, `gregjohnso/pi-monitor`, `pi-better-background-tasks` (own `sh -c`; racy `steer` + `triggerTurn`).
+- **Rejected** (09-20/23): background-bash and monitor packages (`pi-background-bash`, `pi-patty-bg-tasks`, three `pi-monitor`s, `pi-better-background-tasks`): they replace `bash`, add 4+ tools or race `steer` + `triggerTurn`.
 - Residual: a job ending between prompt submit and bg-bash's `input` handler can make pi reject the prompt ("Agent is already processing").
 
 ### pi-web
@@ -204,12 +204,13 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **OmO Native** (`omo-ai` 5.0.0 on senpi, 2026-09-26): 3× our prompt, telemetry, 5-min cache. Worth borrowing: `tool_search`, per-category routing.
 - **NVlabs SoL-Pi** (2026-09-23): nothing fired in 6 runs, best case 2.6 % saving; `then_run` runs shell inside `edit`/`write`.
 - **Removed at the user's request** (09-17/18): pi-claude-bridge, workspace-history, plannotator (plan mode did not block bash). `gsd-pi` (last use April) with `gsd-web`, `gsd-update`; `~/.gsd` kept.
-- `@tintinweb/pi-subagents` (~8,200 schema tokens, silent model fallback, deletes a worktree on a failed commit), `@henryqw/pi-subagent` (3 companion packages), `@ayulab/pi-rewind` (archived, `git clean` data loss), `pi-hermes-memory`/`pi-memory` (background calls, memory in the system prompt), `pi-hashline-edit-pro` (disables `edit`, weak checksums), `pi-agent-browser-native`/`gentle-pi` (prompt changes per turn; gentle-pi downloads a binary), `pi-goal-x` (pi < 0.85), `pi-repl-py` (107 MB venv), `@mjasnikovs/pi-task`, `bigpowers`, `pi-gsd`, `@devinat1/pi-debugger`, `pi-papercuts` (heavy, overlapping or dead).
+- `@tintinweb/pi-subagents` (8.2K schema tokens, silent model fallback, deletes worktrees), `@ayulab/pi-rewind` (`git clean` data loss), memory packages (memory in the system prompt), `pi-hashline-edit-pro` (disables `edit`), per-turn prompt changers (`pi-agent-browser-native`, `gentle-pi`); others heavy, overlapping or dead.
 
 ## History
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-20 — find-gaps: a digest entry that also names later, unreviewed commits no longer holds the reviewed ones (G419's entry held 25 reviewed commits); the G406 revert and the bloat project (G419, −12.5K lines so far) went to the loop.
 - 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): SKILL.md rule, review/skeptic/lens prompts, reviewer.md and APPEND_SYSTEM.md lines, harness review counts bloat; G406 revert sent, pushes held until it lands.
 - 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, and after an `idle:` cycle) and pauses 2 h instead of running idle cycles (c320's pass never ran; c321 idled for ~$10); a pass a cycle runs on its own counts too; status cells with a note (`candidate (c324)`) were invisible to the skeptic (16 findings stuck), fixed.
 - 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted (default 0); a fix's review covers the failed change (`review_base`); `run.sh review` tells the running cycle when main is red or the digest lacks an entry. `wip/find-gaps/DESIGN.md`
@@ -219,25 +220,15 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
 - 2026-10-18 — Harness review: the rest after a failed part stays pending (push 92 had shipped 96 unreviewed commits); `FG_EXIT_GRACE` 120 → 45 s. `reviews/2026-10-18.md`
-- 2026-10-17 — Harness review: `ship_midcycle` ships a reviewed red-main fix mid-cycle. Rollback `reviews/2026-10-17/before/`. `reviews/2026-10-17.md`
-- 2026-10-17 — Advisor `openai/gpt-6-astra` → `anthropic/claude-fable-5-1`; reviewer (also loop gate, skeptic, done-check) `openai/gpt-6-astra` → `openai/gpt-6.1-sol` (the user's pick)
-- 2026-10-17 — cache-ttl: `hash()` threw on `JSON.stringify(undefined)` with `--no-tools`; now hashes "undefined"
-- 2026-10-17 — find-gaps: G332 cascade approved ($2/day, $45/month); pi-lens hang filed (apmantza/pi-lens#4554)
-- 2026-10-16 — Harness review: `cache-ttl` folds mid-conversation system messages (c275: $44 avoidable cache writes). `reviews/2026-10-16.md`
+- 2026-10-08…17 — Daily harness review starts (05:00; a change whose metric fails 3 reviews is rolled back): `edit`/`write`/`read` sequential; `arg-fixes` control characters, CR, `"null"`; bg-bash wait/stop; mid-cycle ships and red-main fixes; no 7th review after 6 fails; cache-ttl folds mid-conversation system messages. `reviews/<date>.md`
+- 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (`MM_ANTHROPIC_SPEND_CAP_USD` in the loop's env.sh; the user: "Raise cap")
 - 2026-10-16 — find-gaps: a reviewer usage limit is no rejection; hang lines add "pi tree"; digest stub test flaky (not fixed)
 - 2026-10-16 — Prompt template `/deeper <task>` (`~/.pi/agent/prompts/deeper.md`, in pi-kit)
-- 2026-10-15 — Harness review: `tool-trim` covers OpenAI Responses system text; `pi-maint sql` backslash fix prepared, not installed (still on 10-16). `reviews/2026-10-15.md`
 - 2026-10-15 — pi 0.99.1 → 1.2.0 with the package versions in Current setup (local permission-system 33.0.8 fork dropped). Rollback `wip/pi-update-1.2/rollback.sh`
 - 2026-10-15 — find-gaps SKILL.md: parallel `builder` sub-agents in own worktrees (≤ 2 running test suites, 4 API-bound)
-- 2026-10-14 — Harness review: `tool-groups` makes `read` sequential; `--direct` ships mid-cycle. `reviews/2026-10-14.md`
 - 2026-10-14 — Read-only `pi-maint` key for unattended sessions; prod jobs G235, G292, G293; Claude trial project ($30 cap)
-- 2026-10-13 — Harness review: no 7th review after 6 fails in a row; `arg-fixes` repairs a CR before `uXXXX`; host stalled 10-11 23:16 to 10-12 12:16. `reviews/2026-10-13.md`
 - 2026-10-13 — `pi-maint` key to the host's admin account (the user's choice; AGENTS.override.md); host journal persistent again
-- 2026-10-11 — Harness review: `bg-bash` runs joined `pi-bg-wait`/`pi-bg-stop`; `arg-fixes` `"null"` in `todo`; reviews must run changed paths. `reviews/2026-10-11.md`
-- 2026-10-10 — Harness review: `arg-fixes` blocks stray control characters in `edit`/`write` (56 calls). `reviews/2026-10-10.md`
-- 2026-10-09 — Harness review: messages with `edit`/`write` run calls in order (`executionMode: "sequential"`). `reviews/2026-10-09.md`
-- 2026-10-08 — Harness review starts (05:00 timer; a change whose metric fails to improve in 3 reviews is rolled back, `reviews/changes.md`). `reviews/2026-10-08.md`
 - 2026-10-07 — find-gaps: UI explorers, re-judging declined findings, trim hand-over. Prod jobs: organisation merge, ParlamentníListy replay, title backfill
 - 2026-10-05 — Public repo `SlanyCukr/pi-lab`; find-gaps: OOM-proof units, affected suites only, `hold-push`; G180 backfills (echo24 codes 1264; bylines 709 + 3006)
 - 2026-10-04 — Pi loop check; auto-continue stops on prices; stale PRs riot-api-project#9, security-money-maker#2 closed; 45 min review grace; ImageMagick on the Pi
