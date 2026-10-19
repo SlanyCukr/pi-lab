@@ -204,7 +204,8 @@ export function tabProblem(input: any, cwd: string): string | undefined {
 			return (
 				`edit blocked: ${named ? `edits[${i}].${key}` : key} has a tab after ${before}, and the file has no tab. ` +
 				"This is a broken escape, usually where a non-ASCII letter (\u00e9, \u0159, \u00a7) was meant, so the edit cannot match " +
-				"or would write a tab into the text. Write the letter itself, or anchor oldText on ASCII-only text next to it. Nothing was changed."
+				"or would write a tab into the text. Write the letter itself, or as a \\uXXXX escape (\u00e9 = \\u00e9) " +
+				"in oldText and newText: when oldText has one, this tool decodes both. Nothing was changed."
 			);
 		}
 	}
@@ -224,7 +225,8 @@ export function placeholderProblem(input: any): string | undefined {
 		return (
 			`edit blocked: ${named ? `edits[${i}].newText` : "newText"} is only ${JSON.stringify(word)}, so the edit would replace ` +
 			`${e.oldText.length} characters of real text with a placeholder. Put the full replacement text in newText. ` +
-			"If the oldText line has non-ASCII letters, anchor oldText on ASCII-only text next to them. " +
+			"Do it in one edit, not through a marker: if the line's non-ASCII letters come out wrong, write them as \\uXXXX escapes " +
+			"(\u00e9 = \\u00e9) in oldText and newText: when oldText has one, this tool decodes both. " +
 			`If ${JSON.stringify(word)} really is the new text, include a neighbouring word in both oldText and newText. Nothing was changed.`
 		);
 	}
