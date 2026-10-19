@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-19 — Deploys after a failed review: `run.sh review` of a fix starts at the failed change (`review_base`, from review-state), and a pass clears review-failed, so both ship during the cycle (51 reviewed commits had waited for the cycle end). G393 a sent (contested = stance only).
 - 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
 - 2026-10-19 — 8 h deploy gap reverted (the user wants frequent deploys): `FG_PUSH_GAP` default 0, mechanism kept; G391 b (checked day text, hard stop).
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): deploys ≤ every 8 h (`FG_PUSH_GAP`), `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
