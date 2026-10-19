@@ -28,7 +28,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `bg-bash`: background bash, sub-agent hand-off, `monitor: true`/`persistent` watches, `/loop` + `schedule_wakeup` + `loop` tool, pi-web liveness hold; `pi-bg-wait`/`pi-bg-stop` at the start or end of a `&&`/`;` chain run in order, `&&` honoured (`index.ts`, `loop.ts`, `mixed.ts`).
 - `cache-ttl`: 1 h prompt cache, main session. Its wake-up system-prompt pin is inactive on pi 1.2.0 (fixed there). Since 2026-10-16 it folds mid-conversation system messages into one head, so a pi-lens `context` injection after a tool change no longer flips the prompt (`PI_SYSTEM_FOLD=0` off; test `node wip/cache-ttl/test.mjs`).
 - `compact-at`: compact at 40 %. `hide-tools`: hides `pi_lens_activate_tools`.
-- `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args; decodes `\uXXXX` escapes in `edit` text the file does not contain; blocks `edit`/`write` text with a stray control character (e.g. backspace); repairs a carriage return before `uXXXX` (an escape whose backslash was eaten).
+- `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args; decodes `\uXXXX` escapes in `edit` text the file does not contain; blocks `edit`/`write` text with a stray control character (e.g. backspace), an `edit` with a tab when the file has none, and an `edit` whose `newText` is only a placeholder (`x`, `XX`, `PLACEHOLDER`, `unused`); repairs a carriage return before `uXXXX` (an escape whose backslash was eaten).
 - `auto-continue`: on in interactive pi; an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`.
 - `tool-groups`: collapsed tool rows, thinking display omitted; marks `edit`/`write`/`read` sequential, so a message with one runs its calls in order.
 - `tool-trim`: short tool descriptions, unused optional params hidden, "Available tools:" list and pi-lens skills dropped in Anthropic, Codex, chat and (since 2026-10-15) OpenAI Responses requests; `PI_TOOL_TRIM=0` off; test `node wip/tool-trim/test.mjs`.
@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): deploys ≤ every 8 h (`FG_PUSH_GAP`), `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Off GPT (the user): reviewer and loop gate → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.

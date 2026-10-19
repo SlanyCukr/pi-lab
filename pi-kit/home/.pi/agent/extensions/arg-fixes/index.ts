@@ -31,6 +31,17 @@
  *    "not found" and 2 wrote it into files. Only non-ASCII code points, and only when the file does
  *    not already contain that exact sequence.
  *
+ * 4. Tabs in edit text. The same broken escape often comes out as a tab: `shrnut\t\u00ed`, `po pra\tsk`,
+ *    `RFC 9116 \t\t\u00a72.5.5`. To 2026-10-19, 65 edit calls with a mid-line tab failed as "not found" (13 in
+ *    one day, retried up to 4 times unchanged), and 15 wrote the tab into a file. An edit whose oldText or
+ *    newText has a tab is blocked when the file has no tab at all (Makefile, *.mk, *.go, *.tsv never are).
+ *
+ * 5. Placeholder newText. While stuck on such a line, Opus ends the edit with `newText: "x"` (also `X`,
+ *    `XX`, `PLACEHOLDER`, `unused`). Over the run 281 such calls; 51 matched (a fuzzy match drops a
+ *    trailing tab, an escape decodes) and replaced real text with "x", e.g. a cs.json key cut to
+ *    `x\u00e9m\u011b\u0159` (19 JSON errors), then 1-3 repair edits. An edit whose newText is only such a
+ *    word, replacing a longer oldText, is blocked.
+ *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
  * touched.
@@ -170,6 +181,56 @@ export function controlCharProblem(toolName: string, input: any, cwd: string): s
 	return undefined;
 }
 
+// Files where a tab is ordinary text even if the current content has none.
+const TAB_NATIVE = /(^|\/)(GNUmakefile|Makefile|[^/]*\.(mk|go|tsv))$/i;
+
+/** Why an edit carries a tab its file cannot contain, or undefined. Exported for the test. */
+export function tabProblem(input: any, cwd: string): string | undefined {
+	const named = Array.isArray(input?.edits);
+	const edits: any[] = named ? input.edits : [input];
+	let text: string | undefined | null = null; // null: not read yet
+	for (const [i, e] of edits.entries()) {
+		for (const key of ["oldText", "newText"]) {
+			const value = e?.[key];
+			if (typeof value !== "string") continue;
+			const at = value.indexOf("\t");
+			if (at < 0) continue;
+			if (text === null) {
+				if (typeof input?.path === "string" && TAB_NATIVE.test(input.path)) return undefined;
+				text = fileText(input?.path, cwd);
+			}
+			if (text === undefined || text.includes("\t")) return undefined; // missing file: the tool says so; tabs in use: may be meant
+			const before = JSON.stringify(value.slice(Math.max(0, at - 30), at));
+			return (
+				`edit blocked: ${named ? `edits[${i}].${key}` : key} has a tab after ${before}, and the file has no tab. ` +
+				"This is a broken escape, usually where a non-ASCII letter (\u00e9, \u0159, \u00a7) was meant, so the edit cannot match " +
+				"or would write a tab into the text. Write the letter itself, or anchor oldText on ASCII-only text next to it. Nothing was changed."
+			);
+		}
+	}
+	return undefined;
+}
+
+const PLACEHOLDER_TEXT = /^(x{1,3}|zz|placeholder|unused)$/i;
+
+/** Why an edit would replace real text with a placeholder word, or undefined. Exported for the test. */
+export function placeholderProblem(input: any): string | undefined {
+	const named = Array.isArray(input?.edits);
+	const edits: any[] = named ? input.edits : [input];
+	for (const [i, e] of edits.entries()) {
+		const word = typeof e?.newText === "string" ? e.newText.trim() : undefined;
+		if (word === undefined || !PLACEHOLDER_TEXT.test(word) || typeof e?.oldText !== "string") continue;
+		if (e.oldText.trim().length < word.length + 3) continue; // a short rename such as `y` -> `x`
+		return (
+			`edit blocked: ${named ? `edits[${i}].newText` : "newText"} is only ${JSON.stringify(word)}, so the edit would replace ` +
+			`${e.oldText.length} characters of real text with a placeholder. Put the full replacement text in newText. ` +
+			"If the oldText line has non-ASCII letters, anchor oldText on ASCII-only text next to them. " +
+			`If ${JSON.stringify(word)} really is the new text, include a neighbouring word in both oldText and newText. Nothing was changed.`
+		);
+	}
+	return undefined;
+}
+
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", (event: any, ctx: any) => {
 		const input = event?.input;
@@ -178,7 +239,9 @@ export default function (pi: ExtensionAPI) {
 			const cwd = ctx?.cwd ?? process.cwd();
 			fixCrEscapes(event.toolName, input, cwd);
 			if (event.toolName === "edit") fixEscapedEdits(input, cwd);
-			const reason = controlCharProblem(event.toolName, input, cwd);
+			const reason =
+				(event.toolName === "edit" ? (placeholderProblem(input) ?? tabProblem(input, cwd)) : undefined) ??
+				controlCharProblem(event.toolName, input, cwd);
 			return reason ? { block: true, reason } : undefined;
 		}
 		dropPlaceholders(event?.toolName, input);

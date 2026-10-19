@@ -1,5 +1,5 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits } from "./index.ts";
+import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, placeholderProblem, tabProblem } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -61,6 +61,30 @@ ok(fixCrEscapes("edit", i, D) === 0 && i.edits[0].newText === "line\ru00e1 two",
 const w: any = { path: "new.md", content: "nap\ru0159. ok\r\n" };
 ok(fixCrEscapes("write", w, D) === 1 && w.content === "nap\u0159. ok\r\n", "write content of a new file repaired");
 ok(fixCrEscapes("edit", { path: "v.json", edits: [{ oldText: "plain", newText: "text" }] }, D) === 0, "no CR: nothing");
+// 11 tabs where a letter was meant (c310 cs.json, c311 security-txt), blocked only in files without tabs
+writeFileSync(`${D}/cs.json`, '{\n  "a": "shrnut\u00ed ud\u00e1lost\u00ed",\n  "gapsNearlyAll": "T\u011bm\u011b\u0159 v\u0161echny"\n}\n');
+r = tabProblem({ path: "cs.json", edits: [{ oldText: "shrnut\t\u00ed ud", newText: "x" }] }, D);
+ok(!!r && r.includes("edits[0].oldText has a tab") && r.includes('after "shrnut"') && r.includes("Nothing was changed"), "tab in oldText of a tab-free file blocked, names field and text before");
+r = tabProblem({ path: "cs.json", edits: [{ oldText: "ud", newText: "po pra\tsk" }] }, D);
+ok(!!r && r.includes("edits[0].newText"), "tab in newText blocked (would write it)");
+r = tabProblem({ path: "cs.json", oldText: '"gapsNearlyAll": "T\t', newText: "y" }, D);
+ok(!!r && r.includes("oldText has a tab") && !r.includes("edits["), "trailing tab (fuzzy match would drop it) blocked, legacy form");
+writeFileSync(`${D}/tabbed.py`, "a = 1\n\tb = 2\n");
+ok(tabProblem({ path: "tabbed.py", edits: [{ oldText: "\tb = 2", newText: "\tb = 3" }] }, D) === undefined, "file that has tabs: allowed");
+writeFileSync(`${D}/Makefile`, "all: x\n");
+ok(tabProblem({ path: `${D}/Makefile`, edits: [{ oldText: "all: x\n", newText: "all: x\n\techo hi\n" }] }, "/") === undefined, "Makefile without tabs yet: allowed");
+ok(tabProblem({ path: "missing.py", edits: [{ oldText: "a\tb", newText: "c" }] }, D) === undefined, "missing file: left to the edit tool");
+ok(tabProblem({ path: "cs.json", edits: [{ oldText: "ud", newText: "ud\u00e1" }] }, D) === undefined, "no tab: nothing");
+// 12 placeholder newText (c312 cs.json: '"gapsNearlyAll": "T\t' -> "x" matched and broke the key)
+r = placeholderProblem({ path: "cs.json", edits: [{ oldText: '    "gapsNearlyAll": "T', newText: "x" }] });
+ok(!!r && r.includes('edits[0].newText is only "x"') && r.includes("Nothing was changed"), "newText x blocked");
+for (const w of ["X", "XX", "xxx", "PLACEHOLDER", "unused", " x\n"]) ok(!!placeholderProblem({ edits: [{ oldText: "some real text", newText: w }] }), `newText ${JSON.stringify(w)} blocked`);
+r = placeholderProblem({ edits: [{ oldText: "a = 1", newText: "a = 2" }, { oldText: "Use simple word order", newText: "X" }] });
+ok(!!r && r.includes("edits[1].newText"), "second edit of a call named");
+ok(placeholderProblem({ edits: [{ oldText: "y", newText: "x" }] }) === undefined, "short rename y -> x allowed");
+ok(placeholderProblem({ edits: [{ oldText: "const xs = []", newText: "const x = []" }] }) === undefined, "x inside real text allowed");
+ok(placeholderProblem({ edits: [{ oldText: "old block", newText: "" }] }) === undefined, "deletion (empty newText) allowed");
+ok(placeholderProblem({ edits: [{ oldText: "old", newText: "y" }] }) === undefined, "other one-letter words not listed");
 // placeholders: the todo update seen 3 times in the loop renamed task 1 to "null"
 let p: any = { action: "update", id: 1, status: "completed", activeForm: "null", description: "null", subject: "null" };
 ok(dropPlaceholders("todo", p) === 3 && JSON.stringify(p) === '{"action":"update","id":1,"status":"completed"}', "todo update: null subject/description/activeForm dropped");
