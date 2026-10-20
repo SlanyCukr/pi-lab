@@ -211,16 +211,15 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-20 — find-gaps: a digest entry that also names later, unreviewed commits no longer holds the reviewed ones (G419's entry held 25 reviewed commits); the G406 revert and the bloat project (G419, −12.5K lines so far) went to the loop.
+- 2026-10-20 — Harness review: the reviewer gets the pre-review steps that passed and skips them (6.6 re-run checks per review; replay 7 → 2, $6.29 → $5.59); pending `pi-maint` answers `\d TABLE`. `reviews/2026-10-20.md`
 - 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): SKILL.md rule, review/skeptic/lens prompts, reviewer.md and APPEND_SYSTEM.md lines, harness review counts bloat; G406 revert sent, pushes held until it lands.
 - 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, and after an `idle:` cycle) and pauses 2 h instead of running idle cycles (c320's pass never ran; c321 idled for ~$10); a pass a cycle runs on its own counts too; status cells with a note (`candidate (c324)`) were invisible to the skeptic (16 findings stuck), fixed.
 - 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted (default 0); a fix's review covers the failed change (`review_base`); `run.sh review` tells the running cycle when main is red or the digest lacks an entry. `wip/find-gaps/DESIGN.md`
-- 2026-10-19 — Harness review: `arg-fixes` blocks placeholder `newText` (`x`; 9 matched and damaged files in a day) and a tab in a tab-free file (13 failed edits). `reviews/2026-10-19.md`
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Off GPT (the user): reviewer and loop gate → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
-- 2026-10-18 — Harness review: the rest after a failed part stays pending (push 92 had shipped 96 unreviewed commits); `FG_EXIT_GRACE` 120 → 45 s. `reviews/2026-10-18.md`
-- 2026-10-08…17 — Daily harness review starts (05:00; a change whose metric fails 3 reviews is rolled back): `edit`/`write`/`read` sequential; `arg-fixes` control characters, CR, `"null"`; bg-bash wait/stop; mid-cycle ships and red-main fixes; no 7th review after 6 fails; cache-ttl folds mid-conversation system messages. `reviews/<date>.md`
+- 2026-10-08…19 — Daily harness review starts (05:00; a change whose metric fails 3 reviews is rolled back): `edit`/`write`/`read` sequential; `arg-fixes` control characters, CR, `"null"`, placeholder `newText`, stray tabs; bg-bash wait/stop; mid-cycle ships and red-main fixes; no 7th review after 6 fails; a failed part's rest stays pending; `FG_EXIT_GRACE` 45 s; cache-ttl folds mid-conversation system messages. `reviews/<date>.md`
 - 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (`MM_ANTHROPIC_SPEND_CAP_USD` in the loop's env.sh; the user: "Raise cap")
 - 2026-10-16 — find-gaps: a reviewer usage limit is no rejection; hang lines add "pi tree"; digest stub test flaky (not fixed)
