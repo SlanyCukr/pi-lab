@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
 - 2026-10-20 — find-gaps: a digest entry that also names later, unreviewed commits no longer holds the reviewed ones (G419's entry held 25 reviewed commits); the G406 revert and the bloat project (G419, −12.5K lines so far) went to the loop.
 - 2026-10-20 — Harness review: the reviewer gets the pre-review steps that passed and skips them (6.6 re-run checks per review; replay 7 → 2, $6.29 → $5.59); pending `pi-maint` answers `\d TABLE`. `reviews/2026-10-20.md`
 - 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): SKILL.md rule, review/skeptic/lens prompts, reviewer.md and APPEND_SYSTEM.md lines, harness review counts bloat; G406 revert sent, pushes held until it lands.
