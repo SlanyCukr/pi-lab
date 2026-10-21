@@ -211,6 +211,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-21 — Harness review: find-gaps SKILL.md: no prereview steps re-run right before `run.sh review` (7 of 13 unit-suite runs repeated); builds count in the 2-heavy-job cap (c330: 3 builds, API calls hung 77 min). `reviews/2026-10-21.md`
+- 2026-10-21 — find-gaps: the runner stops the process groups a cycle left running (`FG_CYCLE_TAG`, `reap_cycle`); c340's timeout left a test run, a server and two builds going for ~3 h, ~4 GB, at load 20-32.
 - 2026-10-20 — find-gaps: a review cut off by a usage limit no longer lets `decide()` push the unreviewed commits (10-18 pushes 97-98 shipped 14 such commits); new `review_owed`. `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — find-gaps: Anthropic refused the subscription sign-in (403 `oauth_not_allowed_for_organization`, ~10 min from 15:37); 3 failed cycles ended the run, down 6 h. A refused sign-in now waits like a usage limit; restarted 21:58.
 - 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
