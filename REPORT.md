@@ -6,7 +6,7 @@ Log of the user's pi setup: what is installed, why, and what was tried.
 
 This section is the source of truth; the sections below explain how it got here.
 
-**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore runs on `anthropic/claude-sonnet-5-5`, the reviewer and the advisor on `anthropic/claude-opus-5-5` (2026-10-21, the user: no Fable; off GPT since 10-18); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18), elsewhere `explore-glm` is off; no local Gemma, no desktop notifications. ImageMagick 7 (trixie debs unpacked without root) is in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (needed by the runner's screenshots and the stub tests). See `AGENTS.md` "This copy".
+**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore runs on `anthropic/claude-sonnet-5-5`, the reviewer and the advisor on `anthropic/claude-opus-5-5` (2026-10-21, the user: no Fable; off GPT since 10-18); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18), elsewhere `explore-glm` is off; the loop's env.sh puts `~/.local/node26` first (c351, G441: prod's Node 26), so loop sessions run pi on Node 26, everything else on Node 24; no local Gemma, no desktop notifications. ImageMagick 7 in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (runner screenshots, stub tests). See `AGENTS.md` "This copy".
 
 | Role | How it is wired |
 |---|---|
