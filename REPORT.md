@@ -129,7 +129,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **Exploration goes to `Explore`** (2026-09-22): Opus delegated 0 of 22 runs before the rule, 2/2 after; quick greps stay local.
 - **explore-glm: GLM-5.3**, only when Codex is rate-limited. GLM-5.3-Flash invented line numbers (2 of 4); GPT-5.6 Terra: Luna's accuracy, more quota.
 - **Reviewer: GPT-6 Astra, high** (2026-09-17): 4 of 5 real reviews found a real defect; $1–3, 2.5–5 min. GPT-6.1 Sol since 2026-10-17 (the user's pick).
-- **No Sonnet 5.5** (2026-09-29, `wip/model-ab/RESULTS.md`): Explore 15/16 vs Luna 16/16; builder 2/4 vs Opus 4/4, missed edge cases. GPT-6 Luna explorer 14/16. Builder trial on Sonnet since 2026-10-21 (subscription usage, ~-$50/day): back to Opus if review fails rise above the 10-19/20 baseline of 9 in 50.
+- **Sonnet 5.5** (A/B 2026-09-29, `wip/model-ab/RESULTS.md`: builder 2/4 vs Opus 4/4). Builder trial on Sonnet since 2026-10-21 (usage, ~-$50/day): back to Opus if review fails exceed the 10-19/20 baseline of 9 in 50.
 - **Codex allowance** (2026-09-22, Pro 5x per 5 h, estimates): Luna 1,250–10,000, Sol 70–700, Astra 25–225.
 
 ### Anthropic auth and billing
@@ -204,13 +204,14 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **OmO Native** (`omo-ai` 5.0.0 on senpi, 2026-09-26): 3× our prompt, telemetry, 5-min cache. Worth borrowing: `tool_search`, per-category routing.
 - **NVlabs SoL-Pi** (2026-09-23): nothing fired in 6 runs, best case 2.6 % saving; `then_run` runs shell inside `edit`/`write`.
 - **Removed at the user's request** (09-17/18): pi-claude-bridge, workspace-history, plannotator (plan mode did not block bash). `gsd-pi` (last use April) with `gsd-web`, `gsd-update`; `~/.gsd` kept.
-- `@tintinweb/pi-subagents` (8.2K schema tokens, silent model fallback, deletes worktrees), `@ayulab/pi-rewind` (`git clean` data loss), memory packages (memory in the system prompt), `pi-hashline-edit-pro` (disables `edit`), per-turn prompt changers (`pi-agent-browser-native`, `gentle-pi`); others heavy, overlapping or dead.
+- `@tintinweb/pi-subagents` (big schema, deletes worktrees), `@ayulab/pi-rewind` (`git clean` data loss), memory packages, `pi-hashline-edit-pro` (disables `edit`), per-turn prompt changers; others heavy, overlapping or dead.
 
 ## History
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-21 — Harness review: find-gaps SKILL.md: no prereview steps re-run right before `run.sh review` (7 of 13 unit-suite runs repeated); builds count in the 2-heavy-job cap (c330: 3 builds, API calls hung 77 min). `reviews/2026-10-21.md`
+- 2026-10-21 — Advisor audit: 50 calls, $62/3 weeks (~1 % of use); 15 changed the outcome, 8 only confirmed; cache works. Kept. `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`
 - 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits; 4 % lost to pi-lens one-turn findings), load +40 % since Fable reviews; reviews use a 5-min cache (~-$20/day); `builder` Opus → Sonnet 5.5 as a trial (~-$50/day, judged by review fails vs 9/50). `wip/find-gaps/DESIGN.md`
 - 2026-10-20…21 — find-gaps runner: a refused sign-in (Anthropic 403 `oauth_not_allowed`, run down 6 h) waits like a usage limit; no push takes commits a cut-off review left unreviewed (`review_owed`; 10-18 pushes 97-98 shipped 14); a digest entry naming later commits no longer holds reviewed ones; `reap_cycle` stops what a cycle left running (c340: ~4 GB for 3 h at load 20-32). `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
