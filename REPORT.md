@@ -60,8 +60,8 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ## How to work here (gotchas)
 
-- Docker on the host (2026-10-06): 29.6.1's buildkit (v0.31.1) crashed dockerd mid-build (`concurrent map iteration and map write`, moby/buildkit#6915); `restart: unless-stopped` containers stayed down 1.5 h. Fixed by Docker 29.8.2 (buildkit v0.33.1) and `"live-restore": true` in `/etc/docker/daemon.json`. The loop's unit is transient: `~/.config/systemd/user/find-gaps-boot.service` restarts it after a reboot unless runner.log ends with "run end".
-- The ISP caps concurrent connections per line (2026-10-05): over the cap, new connections get ICMP "administratively prohibited" ("no route to host", errno 113) from inside the ISP. Headroom ~300–640 connections; a torrent client's half-open attempts used ~100–140 (seeding stopped). Bursty GitHub or scraping failures: check this first.
+- Docker on the host (2026-10-06): buildkit v0.31.1 crashed dockerd mid-build (moby/buildkit#6915), containers down 1.5 h; fixed by Docker 29.8.2 and `"live-restore": true`. The loop's unit is transient: `find-gaps-boot.service` restarts it after a reboot unless runner.log ends with "run end".
+- The ISP caps concurrent connections per line (2026-10-05): over it, new connections get "no route to host" (ICMP admin-prohibited). Headroom ~300–640. Bursty GitHub or scraping failures: check this first.
 - Long prod jobs: one at a time, each in its own `docker compose run --rm --no-deps -T worker …` container, with find-gaps pushes held (`hold-push`). In the live worker (512 MiB) three backfills OOM-killed it; three parallel fetchers failed ~35% of new connections upstream (0% with one) (2026-10-05).
 
 ### Running pi
@@ -211,8 +211,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-21 — Harness review: find-gaps SKILL.md: no prereview steps re-run right before `run.sh review` (7 of 13 unit-suite runs repeated); builds count in the 2-heavy-job cap (c330: 3 builds, API calls hung 77 min). `reviews/2026-10-21.md`
-- 2026-10-21 — `builder` sub-agent Opus 5.5 → Sonnet 5.5 (trial; live check: a builder run used `claude-sonnet-5-5`). Rollback: `model: anthropic/claude-opus-5-5` in `~/.pi/agent/agents/builder.md`.
-- 2026-10-21 — Claude usage: cache fine (97-98 % hits); load +40 % since reviews moved to Fable (10-18). Runner reviews/skeptic now use a 5-min cache (`PI_CACHE_TTL_MAIN=5m`, ~-$20/day). `wip/find-gaps/DESIGN.md`
+- 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits), load +40 % since Fable reviews; reviews use a 5-min cache (~-$20/day); `builder` Opus → Sonnet 5.5 as a trial (~-$50/day, judged by review fails vs 9/50). `wip/find-gaps/DESIGN.md`
 - 2026-10-20…21 — find-gaps runner: a refused sign-in (Anthropic 403 `oauth_not_allowed`, run down 6 h) waits like a usage limit; no push takes commits a cut-off review left unreviewed (`review_owed`; 10-18 pushes 97-98 shipped 14); a digest entry naming later commits no longer holds reviewed ones; `reap_cycle` stops what a cycle left running (c340: ~4 GB for 3 h at load 20-32). `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
 - 2026-10-20 — Harness review: the reviewer gets the pre-review steps that passed and skips them (6.6 re-run checks per review; replay 7 → 2, $6.29 → $5.59); pending `pi-maint` answers `\d TABLE`. `reviews/2026-10-20.md`
