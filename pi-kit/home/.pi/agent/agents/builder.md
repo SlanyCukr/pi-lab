@@ -1,7 +1,7 @@
 ---
 description: Implementation worker for a self-contained, well-specified unit of work. Give it the spec, the files in scope and the test command.
 tools: read, bash, edit, write, grep, find, ls, lens_diagnostics, lsp_navigation
-model: anthropic/claude-opus-5-5
+model: anthropic/claude-sonnet-5-5
 thinking: medium
 ---
 

@@ -14,7 +14,7 @@ This section is the source of truth; the sections below explain how it got here.
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-fable-5-1` (2026-10-18; was `openai/gpt-6.1-sol`), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
-| Builder sub-agent `builder` | `anthropic/claude-opus-5-5`, thinking medium, edit tools + pi-lens diagnostics/LSP |
+| Builder sub-agent `builder` | `anthropic/claude-sonnet-5-5` (trial since 2026-10-21; was Opus 5.5), thinking medium, edit tools + pi-lens diagnostics/LSP |
 | Advisor tool | `anthropic/claude-fable-5-1` (Claude subscription), effort high, `~/.config/rpiv-advisor/advisor.json` |
 
 Packages (`~/.pi/agent/settings.json`, since the 2026-10-15 switch to pi 1.2.0): `@gotgenes/pi-anthropic-auth` 3.4.2, `@gotgenes/pi-subagents` 23.4.0 (tool `subagent`; stops a sub-agent at `max_turns`),
@@ -129,7 +129,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **Exploration goes to `Explore`** (2026-09-22): Opus delegated 0 of 22 runs before the rule, 2/2 after; quick greps stay local.
 - **explore-glm: GLM-5.3**, only when Codex is rate-limited. GLM-5.3-Flash invented line numbers (2 of 4); GPT-5.6 Terra: Luna's accuracy, more quota.
 - **Reviewer: GPT-6 Astra, high** (2026-09-17): 4 of 5 real reviews found a real defect; $1–3, 2.5–5 min. GPT-6.1 Sol since 2026-10-17 (the user's pick).
-- **No Sonnet 5.5** (2026-09-29, `wip/model-ab/RESULTS.md`): Explore 15/16 vs Luna 16/16; builder 2/4 vs Opus 4/4, missed edge cases. GPT-6 Luna explorer 14/16.
+- **No Sonnet 5.5** (2026-09-29, `wip/model-ab/RESULTS.md`): Explore 15/16 vs Luna 16/16; builder 2/4 vs Opus 4/4, missed edge cases. GPT-6 Luna explorer 14/16. Builder trial on Sonnet since 2026-10-21 (subscription usage, ~-$50/day): back to Opus if review fails rise above the 10-19/20 baseline of 9 in 50.
 - **Codex allowance** (2026-09-22, Pro 5x per 5 h, estimates): Luna 1,250–10,000, Sol 70–700, Astra 25–225.
 
 ### Anthropic auth and billing
@@ -211,6 +211,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-21 — Harness review: find-gaps SKILL.md: no prereview steps re-run right before `run.sh review` (7 of 13 unit-suite runs repeated); builds count in the 2-heavy-job cap (c330: 3 builds, API calls hung 77 min). `reviews/2026-10-21.md`
+- 2026-10-21 — `builder` sub-agent Opus 5.5 → Sonnet 5.5 (trial; live check: a builder run used `claude-sonnet-5-5`). Rollback: `model: anthropic/claude-opus-5-5` in `~/.pi/agent/agents/builder.md`.
 - 2026-10-21 — Claude usage: cache fine (97-98 % hits); load +40 % since reviews moved to Fable (10-18). Runner reviews/skeptic now use a 5-min cache (`PI_CACHE_TTL_MAIN=5m`, ~-$20/day). `wip/find-gaps/DESIGN.md`
 - 2026-10-20…21 — find-gaps runner: a refused sign-in (Anthropic 403 `oauth_not_allowed`, run down 6 h) waits like a usage limit; no push takes commits a cut-off review left unreviewed (`review_owed`; 10-18 pushes 97-98 shipped 14); a digest entry naming later commits no longer holds reviewed ones; `reap_cycle` stops what a cycle left running (c340: ~4 GB for 3 h at load 20-32). `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
