@@ -1,5 +1,5 @@
 {
-  "modelKey": "anthropic/claude-fable-5-1",
+  "modelKey": "anthropic/claude-opus-5-5",
   "effort": "high",
   "guidance": {
     "promptSnippet": "Escalate to a stronger reviewer model when stuck or before a consequential decision",

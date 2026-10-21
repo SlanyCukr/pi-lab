@@ -1,7 +1,7 @@
 ---
-description: Independent code reviewer and critic (Claude Fable 5.1, a different model from the Opus builders). Give it a diff, branch or file list plus the intent. It reads the source itself and returns a verdict with defects ranked by severity.
+description: Independent code reviewer and critic (Claude Opus 5.5 with a fresh context; the builders run on Sonnet 5.5). Give it a diff, branch or file list plus the intent. It reads the source itself and returns a verdict with defects ranked by severity.
 tools: read, grep, find, ls, bash
-model: anthropic/claude-fable-5-1
+model: anthropic/claude-opus-5-5
 thinking: high
 run_in_background: true
 ---
