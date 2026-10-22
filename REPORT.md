@@ -211,7 +211,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-22 — Harness review: `run.sh review` pre-reviews only the commits after the passing chain, like the gate (9 calls re-ran ~16 min each); `idle: until HH:MM` for production waits (c348/c352 polled 4 h 11 min). `reviews/2026-10-22.md`
-- 2026-10-22 — `~/bin/gh` → gh 2.103.0 (`~/.local/opt`; Debian 2.46.0 gave empty `--log-failed`, so network re-runs never fired).
+- 2026-10-22 — `~/bin/gh` → gh 2.103.0 (Debian 2.46.0 gave empty `--log-failed`); the runner's network re-run then matched test noise, now case-sensitive and vetoed by a failed test. Host `apt` upgrade: 23 packages (security: curl, expat, xz, ca-certificates; Docker 29.9.2 with live-restore, containers kept running).
 - 2026-10-21 — Advisor audit (50 calls, $62/3 weeks, 15 changed the outcome; kept, `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`, checked live.
 - 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits; 4 % lost to pi-lens one-turn findings), load +40 % since Fable reviews; reviews use a 5-min cache (~-$20/day); `builder` Opus → Sonnet 5.5 as a trial (~-$50/day, judged by review fails vs 9/50). `wip/find-gaps/DESIGN.md`
 - 2026-10-20…21 — find-gaps runner: a refused sign-in waits like a usage limit; no push of commits a cut-off review left unreviewed (`review_owed`); `reap_cycle` stops a cycle's leftover jobs (c340: ~4 GB for 3 h); prereview `tsc` from scratch (TS 7 incremental missed an error). `wip/find-gaps/DESIGN.md`
