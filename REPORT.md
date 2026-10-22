@@ -62,7 +62,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 - Docker on the host (2026-10-06): buildkit v0.31.1 crashed dockerd mid-build (moby/buildkit#6915), containers down 1.5 h; fixed by Docker 29.8.2 and `"live-restore": true`. The loop's unit is transient: `find-gaps-boot.service` restarts it after a reboot unless runner.log ends with "run end".
 - The ISP caps concurrent connections per line (2026-10-05): over it, new connections get "no route to host" (ICMP admin-prohibited). Headroom ~300–640. Bursty GitHub or scraping failures: check this first.
-- Long prod jobs: one at a time, each in its own `docker compose run --rm --no-deps -T worker …` container, with find-gaps pushes held (`hold-push`). In the live worker (512 MiB) three backfills OOM-killed it; three parallel fetchers failed ~35% of new connections upstream (0% with one) (2026-10-05).
+- Long prod jobs: one at a time, with find-gaps pushes held (`.find-gaps/hold-push`): every deploy runs `compose down`, which stops the db and kills any job, one-off container or not (2026-10-22: G460's apply died 53 min in). Three backfills at once OOM-killed the 512 MiB worker; three parallel fetchers failed ~35% of connections (2026-10-05).
 
 ### Running pi
 - `pi -p` from a script or background shell needs `< /dev/null`, or it blocks forever.
