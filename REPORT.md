@@ -243,3 +243,4 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-09-20 — `bg-bash`, `cache-ttl`, `compact-at`, `rpiv-todo`; `edit`-not-bash rule; instruction boundary; auto-retry raised
 - 2026-09-18 — `@gotgenes/pi-subagents` and `pi-anthropic-auth`; ADHD append; `pi-goal`, `hide-tools`; advisor over-calling fixed
 - 2026-09-17 — Original install on pi 0.85.1 (23 extensions probed, 9 installed); advisor patched; pi-lens trimmed
+- 2026-10-22 — G460 identity apply on prod (owner OK): 11,129 articles in runs ae7fffe3 (killed by a deploy) + c5d06c27, pushes held; 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
