@@ -1,0 +1,32 @@
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-5-5",
+  "steeringMode": "one-at-a-time",
+  "followUpMode": "one-at-a-time",
+  "defaultThinkingLevel": "high",
+  "shellCommandPrefix": "unset NODE_ENV",
+  "packages": [
+    "npm:pi-web-access",
+    "npm:@gotgenes/pi-permission-system",
+    "npm:pi-lens",
+    "local-packages/rpiv-advisor",
+    "npm:@gotgenes/pi-subagents",
+    "npm:@gotgenes/pi-anthropic-auth",
+    "npm:@juicesharp/rpiv-todo"
+  ],
+  "warnings": {
+    "anthropicExtraUsage": false
+  },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 65536
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 8,
+    "baseDelayMs": 3000
+  },
+  "theme": "dark",
+  "defaultProjectTrust": "always",
+  "lastChangelogVersion": "1.2.0"
+}

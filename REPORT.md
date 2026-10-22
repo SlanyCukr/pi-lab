@@ -2,7 +2,7 @@
 
 Log of the user's pi setup: what is installed, why, and what was tried.
 
-## Current setup (as of 2026-10-15, pi 1.2.0)
+## Current setup (as of 2026-10-22, pi 1.4.0)
 
 This section is the source of truth; the sections below explain how it got here.
 
@@ -10,16 +10,16 @@ This section is the source of truth; the sections below explain how it got here.
 
 | Role | How it is wired |
 |---|---|
-| Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.2 (no version pin; see AGENTS.md) |
+| Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.3 (no version pin; see AGENTS.md) |
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-opus-5-5` (2026-10-21; Fable 5.1 from 10-18, GPT before), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
 | Builder sub-agent `builder` | `anthropic/claude-sonnet-5-5` (trial since 2026-10-21; was Opus 5.5), thinking medium, edit tools + pi-lens diagnostics/LSP |
 | Advisor tool | `anthropic/claude-opus-5-5` (Claude subscription; Fable 10-17..21), effort high, `~/.config/rpiv-advisor/advisor.json` |
 
-Packages (`~/.pi/agent/settings.json`, since the 2026-10-15 switch to pi 1.2.0): `@gotgenes/pi-anthropic-auth` 3.4.2, `@gotgenes/pi-subagents` 23.4.0 (tool `subagent`; stops a sub-agent at `max_turns`),
-`@gotgenes/pi-permission-system` 40.2.1 from npm (our #962 fix upstream since 33.1.0; 40.x also matches an absolute rule against a relative path, hence six work-tree `rm -rf` allow rules), `@juicesharp/rpiv-todo` 2.13.8,
-`pi-web-access` 0.41.0, `pi-lens` 4.4.3, and the patched advisor `~/.pi/agent/local-packages/rpiv-advisor` (upstream 2.13.8, which strips tool declarations for pi ≥ 1.0, plus our session-id cache fix for rpiv-mono#236, WebSocket cleanup and prompt edit; diffs, switch and rollback scripts in `wip/pi-update-1.2/`).
+Packages (`~/.pi/agent/settings.json`; updated 2026-10-22 with pi 1.4.0, `wip/pi-update-1.4/`): `@gotgenes/pi-anthropic-auth` 3.4.3, `@gotgenes/pi-subagents` 25.0.1 (tool `subagent`; stops a sub-agent at `max_turns`),
+`@gotgenes/pi-permission-system` 40.3.0 pinned (41 loosens external_directory asks; `pi update --extensions` rewrites it to ^41, so update with `npm i` in `~/.pi/agent/npm`) from npm (our #962 fix upstream since 33.1.0; 40.x also matches an absolute rule against a relative path, hence six work-tree `rm -rf` allow rules), `@juicesharp/rpiv-todo` 2.13.9,
+`pi-web-access` 0.44.0, `pi-lens` 4.4.4, and the patched advisor `~/.pi/agent/local-packages/rpiv-advisor` (upstream 2.13.8, which strips tool declarations for pi ≥ 1.0, plus our session-id cache fix for rpiv-mono#236, WebSocket cleanup and prompt edit; diffs, switch and rollback scripts in `wip/pi-update-1.2/`).
 `~/.pi/agent/npm/package.json` `allowScripts` (npm 11): `@ast-grep/cli`, `esbuild` allowed (install or check their binaries); `protobufjs`, `@google/genai`, `tree-sitter-bash` denied (no-op, warning only, or a prebuilt linux-arm64 binary).
 Global npm packages: `npm i -g --prefix ~/.npm-global …`. A bare `-g` from a pi-web shell installs into `~/.local/node`, first on the units' PATH but not in `pi-web.service`.
 `settings.json` also: `"shellCommandPrefix": "unset NODE_ENV"` (pi-web's Next.js server sets `NODE_ENV=production`, and every bash command inherited it); retry `{"enabled": true, "maxRetries": 8, "baseDelayMs": 3000}` (12.7 min of backoff); `warnings.anthropicExtraUsage: false`.
@@ -39,7 +39,7 @@ Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean since 2026-09-24;
 
 Public repo: `~/pi-lab` is `github.com/SlanyCukr/pi-lab` (since 2026-10-05; no loop, no session data). Portable copy `pi-kit/`: `export.sh` snapshots this setup, `install.sh --sub copilot|codex|openai` installs it, `server/` installs a headless host, `box/` has a Docker image and a credential-free test. See its README and "Decisions: portable kit".
 
-Browser UI: `@agegr/pi-web` 0.12.1 (bundles pi 1.2.0; 0.9.3 bundled pi 0.87.1, so web sessions lagged the CLI until 2026-10-15), user service `~/.config/systemd/user/pi-web.service` on `127.0.0.1:30141`,
+Browser UI: `@agegr/pi-web` 0.12.2 (pins pi 1.2.0, nested under it since the CLI went to 1.4.0, so web sessions run 1.2.0), user service `~/.config/systemd/user/pi-web.service` on `127.0.0.1:30141`,
 public through a Cloudflare tunnel since 2026-10-04 (URL in `AGENTS.override.md`, not in git); password in `~/.config/pi-web/env`. See "Decisions: pi-web".
 find-gaps loop and its run page (board): user units on the Pi; host details in `AGENTS.override.md`. Setup: `wip/find-gaps/DESIGN.md` (not in git).
 
@@ -54,7 +54,7 @@ Reviewed 2026-09-23.
 1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key) and gotgenes/pi-packages#962 (tool list relocation on pi ≥0.86); local patches cover both, notes next to them in `wip/`. Drop each local patch when its fix ships: switch the settings entry back to `npm:` and delete the local copy.
 2. The `context7` docs tool went away with the old extension and nothing replaces it; `web_search`/`fetch_content` cover docs lookups.
 3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-4. **pi-lens hang (#4554, closed 2026-10-17):** fix #4563 ships in the release after 4.4.3. Update then; baseline 17 of 62 loop cycles hung (`did not exit within` in runner.log, 10-15..10-18).
+4. **pi-lens hang (#4554):** fix in 4.4.4, installed 2026-10-22. Check `did not exit within` in runner.log after 10-22 10:47 against the baseline 17 of 62 cycles.
 
 Closed 2026-09-23: usage check (fine), backup deleted.
 
@@ -214,7 +214,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-22 — `~/bin/gh` → gh 2.103.0 (`~/.local/opt`; Debian 2.46.0 gave empty `--log-failed`, so network re-runs never fired).
 - 2026-10-21 — Advisor audit (50 calls, $62/3 weeks, 15 changed the outcome; kept, `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`, checked live.
 - 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits; 4 % lost to pi-lens one-turn findings), load +40 % since Fable reviews; reviews use a 5-min cache (~-$20/day); `builder` Opus → Sonnet 5.5 as a trial (~-$50/day, judged by review fails vs 9/50). `wip/find-gaps/DESIGN.md`
-- 2026-10-20…21 — find-gaps runner: a refused sign-in (Anthropic 403 `oauth_not_allowed`, run down 6 h) waits like a usage limit; no push takes commits a cut-off review left unreviewed (`review_owed`; 10-18 pushes 97-98 shipped 14); a digest entry naming later commits no longer holds reviewed ones; `reap_cycle` stops what a cycle left running (c340: ~4 GB for 3 h at load 20-32); prereview `tsc` from scratch (TS 7 incremental missed a type error, push 134 red). `wip/find-gaps/DESIGN.md`
+- 2026-10-20…21 — find-gaps runner: a refused sign-in waits like a usage limit; no push of commits a cut-off review left unreviewed (`review_owed`); `reap_cycle` stops a cycle's leftover jobs (c340: ~4 GB for 3 h); prereview `tsc` from scratch (TS 7 incremental missed an error). `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` dev copy installed as `pi` (`su` with the password the user gave in chat, not stored): `sql` takes backslashes, `\d TABLE`, `\dt [PATTERN]`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
 - 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): SKILL.md rule, review/skeptic/lens prompts, reviewer.md and APPEND_SYSTEM.md lines, harness review counts bloat; G406 revert sent, pushes held until it lands.
 - 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, after an `idle:` cycle) and pauses 2 h instead of idle cycles; annotated status cells reach the skeptic (16 findings had stuck).
@@ -223,11 +223,12 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-18 — Off GPT (the user): reviewer and loop gate → `claude-fable-5-1`, Explore → `claude-sonnet-5-5`.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
-- 2026-10-08…21 — Daily harness review starts (05:00; a change whose metric fails 3 reviews is rolled back): `edit`/`write`/`read` sequential; `arg-fixes` control characters, CR, `"null"`, placeholder `newText`, stray tabs; bg-bash wait/stop; mid-cycle ships and red-main fixes; no 7th review after 6 fails; a failed part's rest stays pending; `FG_EXIT_GRACE` 45 s; cache-ttl folds mid-conversation system messages; reviewer skips passed pre-review steps; no prereview re-runs before `run.sh review`, builds in the 2-heavy-job cap. `reviews/<date>.md`
+- 2026-10-08…22 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back): arg-fixes, bg-bash, ship and review-gate rules, cache-ttl folding, prereview reuse, `idle: until`. Details per day in `reviews/<date>.md`
 - 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (`MM_ANTHROPIC_SPEND_CAP_USD` in the loop's env.sh; the user: "Raise cap")
 - 2026-10-16 — find-gaps: a reviewer usage limit is no rejection; hang lines add "pi tree"; digest stub test flaky (not fixed)
 - 2026-10-16 — Prompt template `/deeper <task>` (`~/.pi/agent/prompts/deeper.md`, in pi-kit)
+- 2026-10-22 — pi 1.2.0 → 1.4.0 + package updates (12 scratch checks first), pi-web 0.12.2, Node 24.22.1 (security), uv 0.13.5 (= CI). Rollback `wip/pi-update-1.4/rollback.sh`; old Node in `~/.local/node-v24.21.0`.
 - 2026-10-15 — pi 0.99.1 → 1.2.0 with the package versions in Current setup (local permission-system 33.0.8 fork dropped). Rollback `wip/pi-update-1.2/rollback.sh`
 - 2026-10-15 — find-gaps SKILL.md: parallel `builder` sub-agents in own worktrees (≤ 2 running test suites, 4 API-bound)
 - 2026-10-14 — Read-only `pi-maint` key for unattended sessions; prod jobs G235, G292, G293; Claude trial project ($30 cap)
