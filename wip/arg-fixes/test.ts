@@ -1,5 +1,5 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, placeholderProblem, tabProblem } from "./index.ts";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, fixSrcPath, placeholderProblem, tabProblem } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -96,4 +96,31 @@ p = { subagent_type: "Explore", thinking: "undefined", model: "", prompt: "null"
 ok(dropPlaceholders("subagent", p) === 2 && p.prompt === "null", "subagent: only listed fields");
 p = { path: "null", content: "null" };
 ok(dropPlaceholders("write", p) === 0 && p.path === "null", "other tools untouched");
+// src paths: the find-gaps worktree has frontend/lib, not frontend/src/lib
+mkdirSync(`${D}/r/frontend/lib/server/queries`, { recursive: true });
+writeFileSync(`${D}/r/frontend/lib/server/queries/a.ts`, "export {};\n");
+mkdirSync(`${D}/r/backend/src/pkg`, { recursive: true });
+p = { pattern: "x", path: `${D}/r/frontend/src/lib/server/queries` };
+let note = fixSrcPath(p, "/");
+ok(p.path === `${D}/r/frontend/lib/server/queries` && !!note?.includes("frontend/src/lib/server/queries does not exist"), "absolute dir: src dropped, note names both");
+p = { path: "frontend/src/lib/server/queries/a.ts" };
+ok(!!fixSrcPath(p, `${D}/r`) && p.path === `${D}/r/frontend/lib/server/queries/a.ts`, "relative file: resolved against cwd");
+p = { path: `${D}/r/frontend/src` };
+ok(!!fixSrcPath(p, "/") && p.path === `${D}/r/frontend`, "bare src dir -> its parent");
+p = { path: `${D}/r/backend/src/pkg` };
+ok(fixSrcPath(p, "/") === undefined && p.path === `${D}/r/backend/src/pkg`, "existing src path untouched");
+p = { path: `${D}/r/frontend/src/nope` };
+ok(fixSrcPath(p, "/") === undefined && p.path === `${D}/r/frontend/src/nope`, "no existing candidate: the tool reports it");
+p = { path: `${D}/r/frontend/lib/missing` };
+ok(fixSrcPath(p, "/") === undefined, "missing path without src: untouched");
+mkdirSync(`${D}/m/src/a/src/b`, { recursive: true });
+mkdirSync(`${D}/m/a/src/b`, { recursive: true });
+mkdirSync(`${D}/m/src/a/b`, { recursive: true });
+p = { path: `${D}/m/src/a/src/x` };
+ok(fixSrcPath(p, "/") === undefined, "missing, no candidate either way");
+p = { path: `${D}/m/src/a/src/y` };
+mkdirSync(`${D}/m/a/src/y`, { recursive: true });
+mkdirSync(`${D}/m/src/a/y`, { recursive: true });
+ok(fixSrcPath(p, "/") === undefined && p.path === `${D}/m/src/a/src/y`, "two candidates: ambiguous, untouched");
+ok(fixSrcPath({ path: 7 }, "/") === undefined && fixSrcPath({}, "/") === undefined, "no string path");
 process.exit(fail);

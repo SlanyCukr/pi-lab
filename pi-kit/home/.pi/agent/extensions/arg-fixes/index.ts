@@ -42,12 +42,18 @@
  *    `x\u00e9m\u011b\u0159` (19 JSON errors), then 1-3 repair edits. An edit whose newText is only such a
  *    word, replacing a longer oldText, is blocked.
  *
+ * 6. A `src` directory the tree does not have. Next.js projects usually keep code in `frontend/src/`, so Opus
+ *    and Sonnet write `frontend/src/lib/...` in a repo whose code sits in `frontend/lib/...`. find-gaps 2026-10-22:
+ *    29 of 91 tool errors (19 grep, 7 find, 3 ls), mostly in Explore sub-agents, though the discovery briefs said
+ *    "there is NO frontend/src". When a read/grep/find/ls path does not exist and exactly one form of it without one `src`
+ *    segment does, the call uses that path and its result starts with a note naming both.
+ *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
  * touched.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -233,10 +239,44 @@ export function placeholderProblem(input: any): string | undefined {
 	return undefined;
 }
 
+const PATH_TOOLS = new Set(["read", "grep", "find", "ls"]);
+
+/** Points a missing path that has a `src` segment at the one existing path without it; returns the note, or undefined. Exported for the test. */
+export function fixSrcPath(input: any, cwd: string): string | undefined {
+	const given = input?.path;
+	if (typeof given !== "string" || !/(^|\/)src(\/|$)/.test(given)) return undefined;
+	const p = given.replace(/^@/, "").replace(/^~(?=\/|$)/, homedir());
+	const abs = isAbsolute(p) ? p : resolve(cwd, p);
+	if (existsSync(abs)) return undefined;
+	const parts = abs.split("/");
+	const found = new Set<string>();
+	parts.forEach((part, i) => {
+		if (part !== "src") return;
+		const candidate = [...parts.slice(0, i), ...parts.slice(i + 1)].join("/") || "/";
+		if (existsSync(candidate)) found.add(candidate);
+	});
+	if (found.size !== 1) return undefined;
+	const [path] = found;
+	input.path = path;
+	return `Note: ${given} does not exist, so this call used ${path} (the same path without its "src" directory).`;
+}
+
 export default function (pi: ExtensionAPI) {
+	const pathNotes = new Map<string, string>();
+	pi.on("tool_result", (event: any) => {
+		const note = pathNotes.get(event?.toolCallId);
+		if (note === undefined) return undefined;
+		pathNotes.delete(event.toolCallId);
+		return { content: [{ type: "text", text: note }, ...(event.content ?? [])] };
+	});
 	pi.on("tool_call", (event: any, ctx: any) => {
 		const input = event?.input;
 		if (!input || typeof input !== "object") return undefined;
+		if (PATH_TOOLS.has(event.toolName)) {
+			const note = fixSrcPath(input, ctx?.cwd ?? process.cwd());
+			if (note !== undefined && typeof event.toolCallId === "string") pathNotes.set(event.toolCallId, note);
+			return undefined;
+		}
 		if (event.toolName === "edit" || event.toolName === "write") {
 			const cwd = ctx?.cwd ?? process.cwd();
 			fixCrEscapes(event.toolName, input, cwd);
