@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, fixSrcPath, placeholderProblem, tabProblem } from "./index.ts";
+import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, fixGrepPattern, fixSrcPath, placeholderProblem, rgParses, tabProblem } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -123,4 +123,35 @@ mkdirSync(`${D}/m/a/src/y`, { recursive: true });
 mkdirSync(`${D}/m/src/a/y`, { recursive: true });
 ok(fixSrcPath(p, "/") === undefined && p.path === `${D}/m/src/a/src/y`, "two candidates: ambiguous, untouched");
 ok(fixSrcPath({ path: 7 }, "/") === undefined && fixSrcPath({}, "/") === undefined, "no string path");
+
+// 7. grep patterns rg cannot parse (real rg; patterns from the find-gaps run)
+const grepFix = (pattern: string, extra: Record<string, unknown> = {}) => {
+  const input: any = { pattern, ...extra };
+  const note = fixGrepPattern(input);
+  return { pattern: input.pattern, note };
+};
+const cases: [string, string][] = [
+  ["fetch(", "fetch\\("],
+  ["disabled={", "disabled=\\{"],
+  ["list(r[", "list\\(r\\["],
+  ["${source}|${expert}|${q}|${search", "\\$\\{source\\}|\\$\\{expert\\}|\\$\\{q\\}|\\$\\{search"],
+  ["onClick={() => window|window.location|router.push|router.replace", "onClick=\\{\\(\\) => window|window.location|router.push|router.replace"],
+  ['execute(f"|execute(f\'|execute\\(.*%', 'execute\\(f"|execute\\(f\'|execute\\(.*%'],
+  ['silence.isError|<ErrorState message={t\\("loadError"\\)}', 'silence.isError|<ErrorState message=\\{t\\("loadError"\\)\\}'],
+];
+for (const [given, want] of cases) {
+  const r = grepFix(given);
+  ok(r.pattern === want && !!r.note && rgParses(r.pattern), `grep ${given} -> ${want} (got ${r.pattern})`);
+}
+for (const valid of ["CREATE INDEX(?! IF NOT EXISTS)", "(\\w)\\1", "foo(bar|baz)", "x{2,3}", "(?i)abc", "plain text"]) {
+  const r = grepFix(valid);
+  ok(r.pattern === valid && r.note === undefined, `grep valid pattern untouched: ${valid}`);
+}
+ok(grepFix("fetch(", { literal: true }).note === undefined, "grep literal: untouched");
+ok(grepFix("|| ['\"]|?? ['\"]").note === undefined, "grep empty alternative (would match every line): untouched");
+ok(grepFix("a{,3}").note === undefined || rgParses(grepFix("a{,3}").pattern), "grep result always parses");
+ok(fixGrepPattern({ pattern: 7 }) === undefined && fixGrepPattern({}) === undefined, "grep no string pattern");
+let calls = 0;
+fixGrepPattern({ pattern: "plain words only" }, () => (calls++, true));
+ok(calls === 0, "grep: no rg spawn for a pattern without ( [ { ? * +");
 process.exit(fail);

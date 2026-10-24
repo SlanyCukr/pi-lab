@@ -48,14 +48,23 @@
  *    "there is NO frontend/src". When a read/grep/find/ls path does not exist and exactly one form of it without one `src`
  *    segment does, the call uses that path and its result starts with a note naming both.
  *
+ * 7. grep patterns rg cannot parse. The model writes code it searches for as a regex: `fetch(`, `disabled={`, `${source}`,
+ *    `onClick={() => window|router.push`. find-gaps to 2026-10-22: 39 of 62 grep regex errors (unclosed group, bad
+ *    repetition, unclosed class), one retry turn each. When rg rejects the whole pattern, each `|` alternative it cannot
+ *    parse alone is searched as literal text (escaping only the stray `{` would leave `()` an empty group that matches
+ *    nothing), and the result starts with a note. Look-around and backreferences (the other 23) need no fix here: the
+ *    `~/.pi/agent/bin/rg` wrapper (`rg-wrapper.sh`) runs such patterns with `--engine=auto` (PCRE2), and the check
+ *    below goes through the same wrapper.
+ *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
  * touched.
  */
 
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // tool -> optional string parameters where "null" / "undefined" / "" / "none" can only mean "not set"
@@ -261,6 +270,31 @@ export function fixSrcPath(input: any, cwd: string): string | undefined {
 	return `Note: ${given} does not exist, so this call used ${path} (the same path without its "src" directory).`;
 }
 
+const PI_RG = join(homedir(), ".pi/agent/bin/rg");
+
+/** Whether rg, as pi's grep tool runs it, accepts the pattern. */
+export function rgParses(pattern: string): boolean {
+	const r = spawnSync(existsSync(PI_RG) ? PI_RG : "rg", ["--no-config", "-q", "--", pattern], { input: "", timeout: 5000 });
+	return !(r.status === 2 && String(r.stderr).includes("regex parse error"));
+}
+
+const escapeMeta = (s: string) => s.replace(/\\.|[.+*?()[\]{}^$|]/gs, (m) => (m.length === 2 ? m : `\\${m}`));
+
+/** Searches each `|` alternative rg cannot parse as literal text; returns the note, or undefined. Exported for the test. */
+export function fixGrepPattern(input: any, parses: (p: string) => boolean = rgParses): string | undefined {
+	const given = input?.pattern;
+	// Look-around and backreferences are regex on purpose; the rg wrapper handles them.
+	if (typeof given !== "string" || input.literal === true || !/[([{?*+]/.test(given) || /\(\?<?[=!]|\\[1-9]|\\k</.test(given) || parses(given)) return undefined;
+	const alts = given.split(/(?<!\\)\|/);
+	if (alts.some((a) => a === "")) return undefined; // `||` would match every line
+	const fixed = alts.map((a) => (parses(a) ? a : escapeMeta(a)));
+	const pattern = fixed.join("|");
+	if (pattern === given || !parses(pattern)) return undefined;
+	input.pattern = pattern;
+	const literal = alts.filter((a, i) => fixed[i] !== a).map((a) => JSON.stringify(a));
+	return `Note: rg cannot parse ${literal.join(", ")} as a regex, so this call searched it as literal text: pattern ${JSON.stringify(pattern)}.`;
+}
+
 export default function (pi: ExtensionAPI) {
 	const pathNotes = new Map<string, string>();
 	pi.on("tool_result", (event: any) => {
@@ -273,8 +307,9 @@ export default function (pi: ExtensionAPI) {
 		const input = event?.input;
 		if (!input || typeof input !== "object") return undefined;
 		if (PATH_TOOLS.has(event.toolName)) {
-			const note = fixSrcPath(input, ctx?.cwd ?? process.cwd());
-			if (note !== undefined && typeof event.toolCallId === "string") pathNotes.set(event.toolCallId, note);
+			const notes = [fixSrcPath(input, ctx?.cwd ?? process.cwd()), event.toolName === "grep" ? fixGrepPattern(input) : undefined];
+			const note = notes.filter((n) => n !== undefined).join("\n");
+			if (note !== "" && typeof event.toolCallId === "string") pathNotes.set(event.toolCallId, note);
 			return undefined;
 		}
 		if (event.toolName === "edit" || event.toolName === "write") {
