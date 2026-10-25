@@ -14,7 +14,7 @@ This section is the source of truth; the sections below explain how it got here.
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-opus-5-5` (2026-10-21; Fable 5.1 from 10-18, GPT before), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
-| Builder sub-agent `builder` | `anthropic/claude-sonnet-5-5` (trial since 2026-10-21; was Opus 5.5), thinking medium, edit tools + pi-lens diagnostics/LSP |
+| Builder sub-agent `builder` | `anthropic/claude-sonnet-5-5` (since 2026-10-21, kept 10-23; was Opus 5.5), thinking medium, edit tools + pi-lens diagnostics/LSP |
 | Advisor tool | `anthropic/claude-opus-5-5` (Claude subscription; Fable 10-17..21), effort high, `~/.config/rpiv-advisor/advisor.json` |
 
 Packages (`~/.pi/agent/settings.json`; updated 2026-10-22 with pi 1.4.0, `wip/pi-update-1.4/`): `@gotgenes/pi-anthropic-auth` 3.4.3, `@gotgenes/pi-subagents` 25.0.1 (tool `subagent`; stops a sub-agent at `max_turns`),
@@ -129,7 +129,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **Exploration goes to `Explore`** (2026-09-22): Opus delegated 0 of 22 runs before the rule, 2/2 after; quick greps stay local.
 - **explore-glm: GLM-5.3**, only when Codex is rate-limited. GLM-5.3-Flash invented line numbers (2 of 4); GPT-5.6 Terra: Luna's accuracy, more quota.
 - **Reviewer: GPT-6 Astra, high** (2026-09-17): 4 of 5 real reviews found a real defect; $1–3, 2.5–5 min. GPT-6.1 Sol since 2026-10-17 (the user's pick).
-- **Sonnet 5.5** (A/B 2026-09-29, `wip/model-ab/RESULTS.md`: builder 2/4 vs Opus 4/4). Builder trial on Sonnet since 2026-10-21 (usage, ~-$50/day): back to Opus if review fails exceed the 10-19/20 baseline of 9 in 50.
+- **Sonnet 5.5** (A/B 2026-09-29, `wip/model-ab/RESULTS.md`: builder 2/4 vs Opus 4/4). Builder on Sonnet since 2026-10-21 (usage, ~-$50/day); kept 10-23: first reviews failed 0 of 13 vs the Opus baseline of 9 in 50. Back to Opus if fails climb past that.
 - **Codex allowance** (2026-09-22, Pro 5x per 5 h, estimates): Luna 1,250–10,000, Sol 70–700, Astra 25–225.
 
 ### Anthropic auth and billing
@@ -213,6 +213,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-25 — Harness review: pi-kit exports the rg wrapper; `install.sh` moves the real rg to `rg.real` (4 install cases tested). Loop stopped, window empty. `reviews/2026-10-25.md`
 - 2026-10-24 — Harness review: grep runs patterns rg rejected (62 loop errors since 09-27): literal-text fallback, look-around via PCRE2. `reviews/2026-10-24.md`
 - 2026-10-23 — Harness review: arg-fixes maps a missing `…/src/…` read/grep/find/ls path to the existing one without `src` (29 of 91 loop tool errors on 10-22). `reviews/2026-10-23.md`
+- 2026-10-25 — Loop restarted at c380 (the user; stopped since 10-22 21:16). Host power cut 10-23 08:40–15:00; prod back on its own. Sonnet builder kept (0/13 first-review fails).
 - 2026-10-22 — Loop down 17:28–18:28: Anthropic revoked the sign-in token (401) and 3 failed cycles ended the run; a 401 `authentication_error` now waits 30 min like a refused sign-in. G467 answered a (genre keys out of topic lists).
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
 - 2026-10-22 — gh 2.103.0 (Debian's gave empty `--log-failed`); network re-run now case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages incl. security fixes, Docker 29.9.2 (live-restore kept containers up).
