@@ -50,6 +50,7 @@ fi
 BACKUP="$HOME/.pi-kit-backup-$(date +%Y%m%d-%H%M%S)"
 while IFS= read -r -d '' f; do
   rel="${f#"$SRC"/}"
+  [ "$rel" = .pi/agent/bin/rg ] && continue # moved aside to rg.real below, not overwritten
   if [ -e "$HOME/$rel" ]; then
     mkdir -p "$BACKUP/$(dirname "$rel")"
     cp -a "$HOME/$rel" "$BACKUP/$rel"
@@ -58,11 +59,26 @@ done < <(find "$SRC" -type f -print0)
 [ -d "$BACKUP" ] && echo "backed up overwritten files to $BACKUP"
 
 # Copy files and fill in the provider placeholders
-rsync -a "$SRC/" "$HOME/"
+rsync -a --exclude=/.pi/agent/bin/rg "$SRC/" "$HOME/"
 while IFS= read -r -d '' f; do
   rel="${f#"$SRC"/}"
   sed -i -e "s#{{SUB_PROVIDER}}#$SUB_PROVIDER#g" -e "s#{{SUB_PLAN}}#$SUB_PLAN#g" "$HOME/$rel"
 done < <(grep -rlZ '{{SUB_' "$SRC")
+
+# rg wrapper: pi runs ~/.pi/agent/bin/rg before any rg on PATH. The wrapper adds PCRE2 for look-around and
+# backreferences and runs the real binary next to it, rg.real (a binary pi downloaded there, or the system rg).
+B="$HOME/.pi/agent/bin"
+mkdir -p "$B"
+if [ -e "$B/rg" ] && [ "$(head -c 2 "$B/rg")" != '#!' ]; then mv "$B/rg" "$B/rg.real"; fi
+if [ ! -e "$B/rg.real" ]; then
+  sys=$(PATH=$(tr : '\n' <<<"$PATH" | grep -vxF "$B" | paste -sd:); command -v rg || true)
+  [ -n "$sys" ] && ln -s "$sys" "$B/rg.real"
+fi
+if [ -e "$B/rg.real" ]; then
+  install -m 755 "$SRC/.pi/agent/bin/rg" "$B/rg"
+else
+  echo "note: no ripgrep yet; pi downloads it to $B/rg on first use. Rerun ./install.sh --files-only then to add the grep wrapper." >&2
+fi
 
 # Dependencies: npm packages from settings.json, then the vendored local packages.
 # --omit=peer keeps npm from pulling a second 520 MB copy of pi into local packages.

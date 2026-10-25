@@ -28,6 +28,8 @@ Run `./export.sh` on the source machine. It rebuilds `home/` from `~/.pi/agent` 
 `model-check` (one of the exported extensions) warns at startup about sub-agent or advisor models that have no login.
 pi-subagents falls back silently in that case: first to a fuzzy-matched model, then to the main model. So without it, Explore would quietly spend Anthropic usage.
 
+`install.sh` puts a small `rg` wrapper at `~/.pi/agent/bin/rg` and keeps the real ripgrep next to it as `rg.real`. With it, `grep` patterns with look-around or backreferences run on PCRE2 instead of failing. Without any ripgrep at install time, rerun `./install.sh --files-only` after pi's first `grep`.
+
 ## Not included
 
 The find-gaps loop, the local Gemma provider, and the semvex code-intel config. pi-web (browser UI as a service) comes with `../server/install-user.sh`; the Cloudflare tunnel stays manual.

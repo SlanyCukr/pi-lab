@@ -210,6 +210,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-10-25 — Harness review: pi-kit exports the rg wrapper; `install.sh` moves the real rg to `rg.real` (4 install cases tested). Loop stopped, window empty. `reviews/2026-10-25.md`
 - 2026-10-24 — Harness review: grep runs patterns rg rejected (62 loop errors since 09-27): literal-text fallback, look-around via PCRE2. `reviews/2026-10-24.md`
 - 2026-10-23 — Harness review: arg-fixes maps a missing `…/src/…` read/grep/find/ls path to the existing one without `src` (29 of 91 loop tool errors on 10-22). `reviews/2026-10-23.md`
 - 2026-10-22 — Loop down 17:28–18:28: Anthropic revoked the sign-in token (401) and 3 failed cycles ended the run; a 401 `authentication_error` now waits 30 min like a refused sign-in. G467 answered a (genre keys out of topic lists).
