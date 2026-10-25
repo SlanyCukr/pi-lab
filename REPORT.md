@@ -129,7 +129,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **Exploration goes to `Explore`** (2026-09-22): Opus delegated 0 of 22 runs before the rule, 2/2 after; quick greps stay local.
 - **explore-glm: GLM-5.3**, only when Codex is rate-limited. GLM-5.3-Flash invented line numbers (2 of 4); GPT-5.6 Terra: Luna's accuracy, more quota.
 - **Reviewer: GPT-6 Astra, high** (2026-09-17): 4 of 5 real reviews found a real defect; $1–3, 2.5–5 min. GPT-6.1 Sol since 2026-10-17 (the user's pick).
-- **Sonnet 5.5** (A/B 2026-09-29, `wip/model-ab/RESULTS.md`: builder 2/4 vs Opus 4/4). Builder on Sonnet since 2026-10-21 (usage, ~-$50/day); kept 10-23: first reviews failed 0 of 13 vs the Opus baseline of 9 in 50. Back to Opus if fails climb past that.
+- **Sonnet 5.5 builder** (since 2026-10-21, usage ~-$50/day; kept 10-23: 0 of 13 first reviews failed vs Opus's 9 in 50). Back to Opus if fails climb past that. Older A/B: `wip/model-ab/RESULTS.md`.
 - **Codex allowance** (2026-09-22, Pro 5x per 5 h, estimates): Luna 1,250–10,000, Sol 70–700, Astra 25–225.
 
 ### Anthropic auth and billing
@@ -157,7 +157,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 ### Sub-agents
 - **`@gotgenes/pi-subagents`** (2026-09-18, over `@tintinweb`): tool schema ~14.1k → ~7.2k tokens; `tools:` is a full allowlist, so children lack advisor, goal and web tools.
 - **Explorer turn cap 40 → 150** (2026-09-20): 5 of 17 runs hit 40. Explorers cite, not quote (GLM reports 8–21K chars → 770 words). Fixed report formats (09-18).
-- **`arg-fixes`** (2026-09-23): Opus 5.5 sent `"null"` for optional `subagent` args; fixed in `event.input`, so stored message and cache stay. Escape decoding (10-08): 20 of 29 failed loop edits; newText gets only non-ASCII escapes decoded. Test `node wip/arg-fixes/test.ts`.
+- **`arg-fixes`** (2026-09-23): fixes `"null"` optional args in `event.input` (stored message and cache stay); non-ASCII escapes in newText decoded (10-08: 20 of 29 failed loop edits). Test `node wip/arg-fixes/test.ts`.
 
 ### Advisor
 - **Shutdown cleanup** (2026-09-23): a cached Codex WebSocket made `pi -p` hang ~300 s after an advisor call; now 15–19 s.
@@ -171,7 +171,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ### bg-bash, monitor, loop
 - **Own `bg-bash`** (2026-09-20): `background: true` on stock `bash`, no new tools (one session had polled CI 137 min). Monitor + `/loop` (09-23) as `bash` parameters stay under the permission rules (`wip/bg-bash/DESIGN-monitor-loop.md`).
-- **Rejected** (09-20/23): background-bash and monitor packages (`pi-background-bash`, `pi-patty-bg-tasks`, three `pi-monitor`s, `pi-better-background-tasks`): they replace `bash`, add 4+ tools or race `steer` + `triggerTurn`.
+- **Rejected** (09-20/23): six background-bash and monitor packages: they replace `bash`, add 4+ tools or race `steer` + `triggerTurn`.
 - Residual: a job ending between prompt submit and bg-bash's `input` handler can make pi reject the prompt ("Agent is already processing").
 
 ### pi-web
@@ -197,7 +197,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 ### Portable kit
 - **`pi-kit` with Copilot sub-agents** (2026-09-23): same `gpt-5.6-luna`/`gpt-6-astra`, so the swap is placeholders; a real turn needs a GitHub login; Astra needs Copilot Pro+.
-- **pi-lab public** (2026-10-05): the only off-machine copy. Gitignored: the loop, eval cases and runs, the chat-message research file (held a password), `*.jsonl`, `AGENTS.override.md` (host details; `main` rewritten once to drop them). `gitleaks` 8.30: 0 of 521 files.
+- **pi-lab public** (2026-10-05): the only off-machine copy. Gitignored: the loop, evals, `*.jsonl`, `AGENTS.override.md` (host details). `gitleaks` before every commit.
 - **Left out of the kit**: pi-web, `models.json` (local Gemma), `code-intel.json` (semvex), skills `.venv` (667 MB), project `.env` allows.
 
 ### Evaluated and rejected
@@ -213,21 +213,21 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-25 — Harness review: pi-kit exports the rg wrapper; `install.sh` moves the real rg to `rg.real` (4 install cases tested). Loop stopped, window empty. `reviews/2026-10-25.md`
 - 2026-10-24 — Harness review: grep runs patterns rg rejected (62 loop errors since 09-27): literal-text fallback, look-around via PCRE2. `reviews/2026-10-24.md`
 - 2026-10-23 — Harness review: arg-fixes maps a missing `…/src/…` read/grep/find/ls path to the existing one without `src` (29 of 91 loop tool errors on 10-22). `reviews/2026-10-23.md`
-- 2026-10-25 — Loop restarted at c380 (the user; stopped since 10-22 21:16). Host power cut 10-23 08:40–15:00; prod back on its own. Sonnet builder kept (0/13 first-review fails). `reap_cycle` keeps podman's pause process (c380 stopped it after the reboot).
-- 2026-10-22 — Loop down 17:28–18:28: Anthropic revoked the sign-in token (401) and 3 failed cycles ended the run; a 401 `authentication_error` now waits 30 min like a refused sign-in. G467 answered a (genre keys out of topic lists).
+- 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
+- 2026-10-22 — Loop down 17:28–18:28 (Anthropic revoked the sign-in token, 3 failed cycles ended the run): a 401 `authentication_error` now waits 30 min like a refused sign-in.
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
 - 2026-10-22 — gh 2.103.0 (Debian's gave empty `--log-failed`); network re-run now case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages incl. security fixes, Docker 29.9.2 (live-restore kept containers up).
 - 2026-10-21 — Advisor audit (50 calls, $62/3 weeks, 15 changed the outcome; kept, `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`, checked live.
 - 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits); reviews use a 5-min cache (~-$20/day); `builder` → Sonnet 5.5 as a trial (judged by review fails vs 9/50).
 - 2026-10-20…21 — find-gaps runner: a refused sign-in waits like a usage limit; `review_owed`; `reap_cycle` stops a cycle's leftover jobs (c340: ~4 GB for 3 h); prereview `tsc` from scratch. `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` update installed as `pi`: `sql` takes backslashes, `\d TABLE`, `\dt`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
-- 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): SKILL.md rule, review/skeptic/lens prompts, reviewer.md and APPEND_SYSTEM.md lines, harness review counts bloat; G406 revert sent, pushes held until it lands.
+- 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): rule in SKILL.md, review prompts, reviewer.md, APPEND_SYSTEM.md; harness review counts bloat; G406 reverted.
 - 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, after an `idle:` cycle) and pauses 2 h instead of idle cycles; annotated status cells reach the skeptic (16 findings had stuck).
-- 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted (default 0); a fix's review covers the failed change (`review_base`); `run.sh review` tells the running cycle when main is red or the digest lacks an entry. `wip/find-gaps/DESIGN.md`
+- 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted; `review_base`; `run.sh review` tells the running cycle when main is red or the digest lacks an entry.
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
-- 2026-10-08…24 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back): arg-fixes, bg-bash, ship and review-gate rules, cache-ttl folding, prereview reuse, `idle: until`, `src` paths, grep patterns. Details per day in `reviews/<date>.md`
+- 2026-10-08…25 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
 - 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (the user); find-gaps: a reviewer usage limit is no rejection; `/deeper <task>` prompt template (in pi-kit)
 - 2026-10-22 — pi 1.2.0 → 1.4.0 + package updates (12 scratch checks first), pi-web 0.12.2, Node 24.22.1 (security), uv 0.13.5 (= CI). Rollback `wip/pi-update-1.4/rollback.sh`; old Node in `~/.local/node-v24.21.0`.
