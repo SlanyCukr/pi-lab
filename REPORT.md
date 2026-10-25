@@ -213,7 +213,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-25 — Harness review: pi-kit exports the rg wrapper; `install.sh` moves the real rg to `rg.real` (4 install cases tested). Loop stopped, window empty. `reviews/2026-10-25.md`
 - 2026-10-24 — Harness review: grep runs patterns rg rejected (62 loop errors since 09-27): literal-text fallback, look-around via PCRE2. `reviews/2026-10-24.md`
 - 2026-10-23 — Harness review: arg-fixes maps a missing `…/src/…` read/grep/find/ls path to the existing one without `src` (29 of 91 loop tool errors on 10-22). `reviews/2026-10-23.md`
-- 2026-10-25 — Loop restarted at c380 (the user; stopped since 10-22 21:16). Host power cut 10-23 08:40–15:00; prod back on its own. Sonnet builder kept (0/13 first-review fails).
+- 2026-10-25 — Loop restarted at c380 (the user; stopped since 10-22 21:16). Host power cut 10-23 08:40–15:00; prod back on its own. Sonnet builder kept (0/13 first-review fails). `reap_cycle` keeps podman's pause process (c380 stopped it after the reboot).
 - 2026-10-22 — Loop down 17:28–18:28: Anthropic revoked the sign-in token (401) and 3 failed cycles ended the run; a 401 `authentication_error` now waits 30 min like a refused sign-in. G467 answered a (genre keys out of topic lists).
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
 - 2026-10-22 — gh 2.103.0 (Debian's gave empty `--log-failed`); network re-run now case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages incl. security fixes, Docker 29.9.2 (live-restore kept containers up).
