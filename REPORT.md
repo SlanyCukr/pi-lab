@@ -213,7 +213,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 
 - 2026-10-26 — Harness review: the runner's exit-hang line asks the hung pi's event loop (inspector) what keeps it alive; pre-review speed sent to the loop (unit suite 285 s alone, 634 s beside CI). `reviews/2026-10-26.md`
 - 2026-10-23…25 — Harness reviews: arg-fixes drops a missing `src` segment from paths; grep searches unparsable alternatives as text, look-around via PCRE2 (`bin/rg` wrapper, also in pi-kit).
-- 2026-10-26 — Site simplification project G489 (the owner's pick b): Týden and Redakce merged, live; G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows.
+- 2026-10-26 — Site simplification project G489 (the owner's pick b): Týden and Redakce merged, live; G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows. Runner: Python `requests` timeouts count as network errors (pip-audit red).
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (Anthropic revoked the sign-in token, 3 failed cycles ended the run): a 401 `authentication_error` now waits 30 min like a refused sign-in.
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
