@@ -62,6 +62,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 - Docker on the host (2026-10-06): buildkit v0.31.1 crashed dockerd mid-build (moby/buildkit#6915), containers down 1.5 h; fixed by Docker 29.8.2 and `"live-restore": true`. The loop's unit is transient: `find-gaps-boot.service` restarts it after a reboot unless runner.log ends with "run end".
 - The ISP caps concurrent connections per line (2026-10-05): over it, new connections get "no route to host" (ICMP admin-prohibited). Headroom ~300–640. Bursty GitHub or scraping failures: check this first.
+- Merge-map backfills run themselves (the owner, 2026-10-26 "yes auto"): after a deploy that changes the canonical merge map, the worker runs `canonical-merge` once; a standing OK for that class only, other prod writes still wait for him.
 - Long prod jobs: one at a time, with find-gaps pushes held (`.find-gaps/hold-push`): every deploy runs `compose down`, which stops the db and kills any job, one-off container or not (2026-10-22: G460's apply died 53 min in). Three backfills at once OOM-killed the 512 MiB worker; three parallel fetchers failed ~35% of connections (2026-10-05).
 
 ### Running pi
@@ -212,18 +213,19 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 
 - 2026-10-26 — Harness review: the runner's exit-hang line asks the hung pi's event loop (inspector) what keeps it alive; pre-review speed sent to the loop (unit suite 285 s alone, 634 s beside CI). `reviews/2026-10-26.md`
 - 2026-10-23…25 — Harness reviews: arg-fixes drops a missing `src` segment from paths; grep searches unparsable alternatives as text, look-around via PCRE2 (`bin/rg` wrapper, also in pi-kit).
+- 2026-10-26 — Site simplification project G489 (the owner's pick b): Týden and Redakce merged, live; G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (Anthropic revoked the sign-in token, 3 failed cycles ended the run): a 401 `authentication_error` now waits 30 min like a refused sign-in.
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
-- 2026-10-22 — gh 2.103.0 (Debian's gave empty `--log-failed`); network re-run now case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages incl. security fixes, Docker 29.9.2 (live-restore kept containers up).
-- 2026-10-21 — Advisor audit (50 calls, $62/3 weeks, 15 changed the outcome; kept, `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`, checked live.
+- 2026-10-22 — gh 2.103.0; network re-run case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages, Docker 29.9.2 (live-restore kept containers up).
+- 2026-10-21 — Advisor audit (kept; `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`.
 - 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits); reviews use a 5-min cache (~-$20/day); `builder` → Sonnet 5.5 as a trial (judged by review fails vs 9/50).
 - 2026-10-20…21 — find-gaps runner: a refused sign-in waits like a usage limit; `review_owed`; `reap_cycle` stops a cycle's leftover jobs (c340: ~4 GB for 3 h); prereview `tsc` from scratch. `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` update installed as `pi`: `sql` takes backslashes, `\d TABLE`, `\dt`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
 - 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): rule in SKILL.md, review prompts, reviewer.md, APPEND_SYSTEM.md; harness review counts bloat; G406 reverted.
 - 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, after an `idle:` cycle) and pauses 2 h instead of idle cycles; annotated status cells reach the skeptic (16 findings had stuck).
 - 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted; `review_base`; `run.sh review` tells the running cycle when main is red or the digest lacks an entry.
-- 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
+- 2026-10-18 — Critical review (site mainly for the owner): `project-check` every 15 commits, `Audience: owner`, frozen browser-spec count.
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
 - 2026-10-08…26 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
