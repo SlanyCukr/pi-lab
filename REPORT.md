@@ -54,7 +54,7 @@ Reviewed 2026-09-23.
 1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key) and gotgenes/pi-packages#962 (tool list relocation on pi ≥0.86); local patches cover both, notes next to them in `wip/`. Drop each local patch when its fix ships: switch the settings entry back to `npm:` and delete the local copy.
 2. The `context7` docs tool went away with the old extension and nothing replaces it; `web_search`/`fetch_content` cover docs lookups.
 3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-4. **pi-lens hang (#4554):** fix in 4.4.4, installed 2026-10-22. Check `did not exit within` in runner.log after 10-22 10:47 against the baseline 17 of 62 cycles.
+4. **Exit hang:** pi-lens 4.4.4 (10-22) did not change it: 4 of 15 cycles (c380-c394), as 17 of 62 before, 45 s each. Since 10-26 the runner's `did not exit` line ends with `event loop:` (what keeps pi alive); fix from what it names.
 
 Closed 2026-09-23: usage check (fine), backup deleted.
 
@@ -210,9 +210,8 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-25 — Harness review: pi-kit exports the rg wrapper; `install.sh` moves the real rg to `rg.real` (4 install cases tested). Loop stopped, window empty. `reviews/2026-10-25.md`
-- 2026-10-24 — Harness review: grep runs patterns rg rejected (62 loop errors since 09-27): literal-text fallback, look-around via PCRE2. `reviews/2026-10-24.md`
-- 2026-10-23 — Harness review: arg-fixes maps a missing `…/src/…` read/grep/find/ls path to the existing one without `src` (29 of 91 loop tool errors on 10-22). `reviews/2026-10-23.md`
+- 2026-10-26 — Harness review: the runner's exit-hang line asks the hung pi's event loop (inspector) what keeps it alive; pre-review speed sent to the loop (unit suite 285 s alone, 634 s beside CI). `reviews/2026-10-26.md`
+- 2026-10-23…25 — Harness reviews: arg-fixes drops a missing `src` segment from paths; grep searches unparsable alternatives as text, look-around via PCRE2 (`bin/rg` wrapper, also in pi-kit).
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (Anthropic revoked the sign-in token, 3 failed cycles ended the run): a 401 `authentication_error` now waits 30 min like a refused sign-in.
 - 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
@@ -227,7 +226,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-10-18 — Critical review; the user's pick (site mainly for them): `project-check` every 15 commits, `Audience: owner` weights, frozen browser-spec count; pipefail `| grep -q` race fixed. `wip/find-gaps/DESIGN.md`
 - 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
 - 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
-- 2026-10-08…25 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
+- 2026-10-08…26 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
 - 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (the user); find-gaps: a reviewer usage limit is no rejection; `/deeper <task>` prompt template (in pi-kit)
 - 2026-10-22 — pi 1.2.0 → 1.4.0 + package updates (12 scratch checks first), pi-web 0.12.2, Node 24.22.1 (security), uv 0.13.5 (= CI). Rollback `wip/pi-update-1.4/rollback.sh`; old Node in `~/.local/node-v24.21.0`.
