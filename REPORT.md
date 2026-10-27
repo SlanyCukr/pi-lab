@@ -28,6 +28,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `bg-bash`: background bash, sub-agent hand-off, `monitor: true`/`persistent` watches, `/loop` + `schedule_wakeup` + `loop` tool, pi-web liveness hold; `pi-bg-wait`/`pi-bg-stop` at the start or end of a `&&`/`;` chain run in order, `&&` honoured (`index.ts`, `loop.ts`, `mixed.ts`).
 - `cache-ttl`: 1 h prompt cache, main session. Its wake-up system-prompt pin is inactive on pi 1.2.0 (fixed there). Since 2026-10-16 it folds mid-conversation system messages into one head, so a pi-lens `context` injection after a tool change no longer flips the prompt (`PI_SYSTEM_FOLD=0` off; test `node wip/cache-ttl/test.mjs`).
 - `compact-at`: compact at 40 %. `hide-tools`: hides `pi_lens_activate_tools`.
+- `lsp-exit` (2026-10-27): unrefs vscode-jsonrpc's partial-message timer (bundled in pi-lens), which re-arms forever after an LSP server stops mid-message and kept a finished `pi -p` alive (test `node wip/lsp-exit/test.mjs`).
 - `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args; decodes `\uXXXX` escapes in `edit` text the file does not contain; blocks `edit`/`write` text with a stray control character (e.g. backspace), an `edit` with a tab when the file has none, and an `edit` whose `newText` is only a placeholder (`x`, `XX`, `PLACEHOLDER`, `unused`); repairs a carriage return before `uXXXX` (an escape whose backslash was eaten); maps a missing `read`/`grep`/`find`/`ls` path to the one existing path without a `src` segment, noted in the result. A `grep` alternative rg cannot parse is searched as literal text, noted; `~/.pi/agent/bin/rg` wraps `rg.real`, adding `--engine=auto` for look-around (`wip/arg-fixes/rg-wrapper.sh`).
 - `auto-continue`: on in interactive pi; an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`.
 - `tool-groups`: collapsed tool rows, thinking display omitted; marks `edit`/`write`/`read` sequential, so a message with one runs its calls in order.
@@ -54,7 +55,7 @@ Reviewed 2026-09-23.
 1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key) and gotgenes/pi-packages#962 (tool list relocation on pi ≥0.86); local patches cover both, notes next to them in `wip/`. Drop each local patch when its fix ships: switch the settings entry back to `npm:` and delete the local copy.
 2. The `context7` docs tool went away with the old extension and nothing replaces it; `web_search`/`fetch_content` cover docs lookups.
 3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-4. **Exit hang:** pi-lens 4.4.4 (10-22) did not change it: 4 of 15 cycles (c380-c394), as 17 of 62 before, 45 s each. Since 10-26 the runner's `did not exit` line ends with `event loop:` (what keeps pi alive); fix from what it names.
+4. **Exit hang:** the runner's `event loop:` probe (10-26) named the cause in c403: vscode-jsonrpc's partial-message timer; `lsp-exit` (10-27) unrefs it. Confirm on the next loop run: `did not exit` lines per cycle (51 in 406 so far). Upstream note: `wip/lsp-exit/ISSUE-DRAFT.md`, not posted.
 
 Closed 2026-09-23: usage check (fine), backup deleted.
 
@@ -211,24 +212,16 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-26 — Harness review: the runner's exit-hang line asks the hung pi's event loop (inspector) what keeps it alive; pre-review speed sent to the loop (unit suite 285 s alone, 634 s beside CI). `reviews/2026-10-26.md`
-- 2026-10-23…25 — Harness reviews: arg-fixes drops a missing `src` segment from paths; grep searches unparsable alternatives as text, look-around via PCRE2 (`bin/rg` wrapper, also in pi-kit).
-- 2026-10-26 — Site simplification G489 (the owner's pick b) done and live: Týden, Redakce, Aktéři merged, nav 3 groups, plain wording; loop stopped 23:29 at the owner's request ($128.60 run); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows. Runner: Python `requests` timeouts count as network errors (pip-audit red).
+- 2026-10-23…27 — Harness reviews: arg-fixes drops a missing `src` path segment; grep runs patterns rg rejects (rg wrapper, in pi-kit); exit-hang probe found the cause, `lsp-exit` lets pi exit (100 s hang → 5 s). `reviews/2026-10-27.md`
+- 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
-- 2026-10-22 — Loop down 17:28–18:28 (Anthropic revoked the sign-in token, 3 failed cycles ended the run): a 401 `authentication_error` now waits 30 min like a refused sign-in.
-- 2026-10-22 — G460 identity apply on prod: 11,129 articles (2 runs; a deploy killed the first); 30 d ODS 684→2,886, STAN 843→2,314, SPD 427→1,775, Piráti 1,112→1,628.
-- 2026-10-22 — gh 2.103.0; network re-run case-sensitive, vetoed by a failed test. Host `apt` upgrade: 23 packages, Docker 29.9.2 (live-restore kept containers up).
-- 2026-10-21 — Advisor audit (kept; `wip/rpiv-advisor-local/AUDIT-2026-10-21.md`). No Fable (the user): reviewer, loop gate and advisor → `claude-opus-5-5`.
-- 2026-10-21 — Claude usage (the user): cache fine (97-98 % hits); reviews use a 5-min cache (~-$20/day); `builder` → Sonnet 5.5 as a trial (judged by review fails vs 9/50).
+- 2026-10-22 — Loop down 17:28–18:28 (revoked sign-in token; a 401 now waits 30 min); G460 identity apply on prod (11,129 articles); gh 2.103.0; network re-runs case-sensitive; host `apt` upgrade (Docker 29.9.2, live-restore).
+- 2026-10-21 — Advisor audit kept; no Fable (the user): reviewer, gate and advisor → `claude-opus-5-5`; reviews use a 5-min cache; `builder` → Sonnet 5.5 (trial, kept 10-23).
 - 2026-10-20…21 — find-gaps runner: a refused sign-in waits like a usage limit; `review_owed`; `reap_cycle` stops a cycle's leftover jobs (c340: ~4 GB for 3 h); prereview `tsc` from scratch. `wip/find-gaps/DESIGN.md`
 - 2026-10-20 — `pi-maint` update installed as `pi`: `sql` takes backslashes, `\d TABLE`, `\dt`; writes, `cli` on the ro key and shells still refused. Old sha256 b8adc684…
-- 2026-10-19 — Protection in proportion (the owner: guards for maybe-failures are bloat): rule in SKILL.md, review prompts, reviewer.md, APPEND_SYSTEM.md; harness review counts bloat; G406 reverted.
-- 2026-10-19 — find-gaps: the runner requests discovery (every 8th cycle, after an `idle:` cycle) and pauses 2 h instead of idle cycles; annotated status cells reach the skeptic (16 findings had stuck).
-- 2026-10-19 — Frequent deploys (the user): 8 h `FG_PUSH_GAP` reverted; `review_base`; `run.sh review` tells the running cycle when main is red or the digest lacks an entry.
-- 2026-10-18 — Critical review (site mainly for the owner): `project-check` every 15 commits, `Audience: owner`, frozen browser-spec count.
-- 2026-10-18 — Loop down 12:36–19:00 (a builder's `pgrep -f run.sh | xargs kill`): `RestartForceExitStatus=SIGTERM`, pattern kills denied by policy, `runner.alive`, `worktrees-left`.
-- 2026-10-18 — find-gaps speed: `.find-gaps/prereview.sh` runs before every reviewer call; `explore-glm` (≤ 2 at once) in loop sessions; reviewer stderr timestamped.
-- 2026-10-08…26 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
+- 2026-10-19 — Protection in proportion (the owner: maybe-failure guards are bloat) in SKILL.md, review prompts, APPEND_SYSTEM.md; discovery every 8th cycle, a 2 h pause instead of idle cycles; 8 h `FG_PUSH_GAP` reverted.
+- 2026-10-18 — Critical review (`project-check`, `Audience: owner`, frozen browser-spec count); loop down 12:36–19:00 (a builder's pattern kill, now denied); `prereview.sh` before every reviewer call; `explore-glm` in loop sessions.
+- 2026-10-08…27 — Daily harness review (05:00; a change whose metric fails 3 reviews is rolled back). Details per day in `reviews/<date>.md`
 - 2026-10-17 — Advisor → `claude-fable-5-1` (reviewer moved off GPT on 10-18); cache-ttl hashes `undefined` under `--no-tools`; G332 cascade approved ($2/day, $45/month); pi-lens hang filed (#4554)
 - 2026-10-16 — Anthropic trial cap 30 → 80 USD (the user); find-gaps: a reviewer usage limit is no rejection; `/deeper <task>` prompt template (in pi-kit)
 - 2026-10-22 — pi 1.2.0 → 1.4.0 + package updates (12 scratch checks first), pi-web 0.12.2, Node 24.22.1 (security), uv 0.13.5 (= CI). Rollback `wip/pi-update-1.4/rollback.sh`; old Node in `~/.local/node-v24.21.0`.

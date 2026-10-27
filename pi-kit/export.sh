@@ -34,7 +34,7 @@ for f in "$A"/agents/*.md; do sub < "$f" > "$OUT/.pi/agent/agents/$(basename "$f
 for f in "$A"/prompts/*.md; do [ -e "$f" ] && sub < "$f" > "$OUT/.pi/agent/prompts/$(basename "$f")"; done
 
 # Own extensions (source only)
-for d in arg-fixes auto-continue bg-bash cache-ttl compact-at hide-tools model-check tool-groups tool-trim; do
+for d in arg-fixes auto-continue bg-bash cache-ttl compact-at hide-tools lsp-exit model-check tool-groups tool-trim; do
   rsync -a --include='*.ts' --exclude='*' "$A/extensions/$d/" "$OUT/.pi/agent/extensions/$d/"
 done
 # rg wrapper for arg-fixes (look-around on PCRE2); install.sh puts it in front of the real binary
