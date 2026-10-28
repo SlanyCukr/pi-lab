@@ -212,7 +212,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-23…27 — Harness reviews: arg-fixes drops a missing `src` path segment; grep runs patterns rg rejects (rg wrapper, in pi-kit); exit-hang probe found the cause, `lsp-exit` lets pi exit (100 s hang → 5 s). `reviews/2026-10-27.md`
+- 2026-10-23…28 — Harness reviews: arg-fixes drops a missing `src` path segment; grep runs patterns rg rejects (rg wrapper, in pi-kit); exit-hang probe found the cause, `lsp-exit` lets pi exit (100 s hang → 5 s); SKILL.md: create `digest.md` when absent (23 misses in 81 mains). `reviews/2026-10-28.md`
 - 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (revoked sign-in token; a 401 now waits 30 min); G460 identity apply on prod (11,129 articles); gh 2.103.0; network re-runs case-sensitive; host `apt` upgrade (Docker 29.9.2, live-restore).
