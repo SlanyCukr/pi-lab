@@ -23,7 +23,8 @@
  * Monitors (`monitor: true`, main session): a background command whose stdout lines are events.
  * Lines are batched (1 s) into one queued message per monitor, rendered when it is sent, so they
  * keep batching while pi is busy. More than MONITOR_FLOOD_LINES lines in a minute stop it. It
- * expires after `timeout` (default 300 s, max 3600 s) unless `persistent: true`. `pi-bg-stop <id>`
+ * expires after `timeout` (default 300 s, max 3600 s) unless `persistent: true`, which ignores `timeout`
+ * (models fill the field anyway: 129 of 133 persistent calls in one session sent 3600). `pi-bg-stop <id>`
  * (answered by the tool, like `pi-bg-wait`) stops a monitor, background command or loop quietly.
  * Being part of `bash`, monitors stay under the permission policy's bash rules.
  *
@@ -862,7 +863,7 @@ export default function (pi: ExtensionAPI) {
 				Type.Boolean({ description: "Main session only: run as a watch; each stdout line reaches you as a message. Expires after timeout (default 300, max 3600 s) unless persistent." }),
 			),
 			persistent: Type.Optional(
-				Type.Boolean({ description: "With monitor: no expiry; runs until `pi-bg-stop <id>` or the session ends. For session-long watches (PR comments, CI, chats)." }),
+				Type.Boolean({ description: "With monitor: no expiry (timeout is ignored); runs until `pi-bg-stop <id>` or the session ends. For session-long watches (PR comments, CI, chats)." }),
 			),
 		}),
 		async execute(toolCallId, params: any, signal, onUpdate, ctx) {
@@ -961,8 +962,9 @@ export default function (pi: ExtensionAPI) {
 			if (monitor) {
 				if (child) throw new Error("monitor works in the main session only: a sub-agent's run ends before its events could arrive.");
 				if (process.platform === "win32") throw new Error("monitor needs POSIX process groups.");
-				if (rest.timeout === undefined && !persistent) rest.timeout = MONITOR_DEFAULT_S;
-				else if (rest.timeout !== undefined && !persistent && rest.timeout > MONITOR_MAX_S) rest.timeout = MONITOR_MAX_S;
+				if (persistent) delete rest.timeout;
+				else if (rest.timeout == null) rest.timeout = MONITOR_DEFAULT_S;
+				else if (rest.timeout > MONITOR_MAX_S) rest.timeout = MONITOR_MAX_S;
 				const call = { background: true, autoMs: 0, monitor: true, persistent: Boolean(persistent), label: rest.command } as {
 					background: boolean;
 					autoMs: number;
@@ -975,7 +977,7 @@ export default function (pi: ExtensionAPI) {
 				const result = await tool.execute(toolCallId, rest, signal, onUpdate, ctx);
 				if (!call.job) return result; // it ended before it could be handed off
 				const job = call.job;
-				const expiry = rest.timeout !== undefined ? `expires in ${rest.timeout}s` : "persistent: runs until stopped or the session ends";
+				const expiry = rest.timeout != null ? `expires in ${rest.timeout}s` : "persistent: runs until stopped or the session ends";
 				return {
 					...result,
 					content: [

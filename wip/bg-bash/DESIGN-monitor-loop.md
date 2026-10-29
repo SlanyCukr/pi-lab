@@ -10,8 +10,10 @@ wake-ups share one race-safe queue (flush only when pi is idle, no compaction, n
   all lines buffered at flush time (so lines keep batching while pi is busy). Buffer keeps the newest 100 lines,
   counts the dropped ones and points to the log.
 - Flood stop: more than 120 lines in a rolling minute terminates the monitor with a "tighter filter" notice.
-- Expiry: `timeout` default 300 s, max 3600 s; `persistent: true` without timeout runs until stopped or the session ends.
-  With `persistent: true`, an explicitly given timeout is honoured as is (no 3600 s cap): persistent means session-length.
+- Expiry: `timeout` default 300 s (also for `timeout: null`), max 3600 s; `persistent: true` runs until stopped or the session ends.
+  `persistent: true` ignores `timeout` (harness review 2026-10-29). It used to honour an explicit one, but the tool schema
+  makes `timeout` required, so 129 of 133 persistent calls in the pi-lab session sent 3600 and expired hourly: 119 expiries,
+  each a wake-up turn that re-armed the same watch ($31.58 over 15 days). A watch that should end has `timeout N` in its command.
 - Stop: `pi-bg-stop <id>` (answered by the tool itself, like `pi-bg-wait`): terminates the group, no wake-up.
   Works for plain background jobs too.
 - End notice: expired / flooded / exited (code, events delivered, remaining lines, log tail on non-zero exit).
