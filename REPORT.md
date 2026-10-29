@@ -63,7 +63,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 - Docker on the host (2026-10-06): buildkit v0.31.1 crashed dockerd mid-build (moby/buildkit#6915), containers down 1.5 h; fixed by Docker 29.8.2 and `"live-restore": true`. The loop's unit is transient: `find-gaps-boot.service` restarts it after a reboot unless runner.log ends with "run end".
 - The ISP caps concurrent connections per line (2026-10-05): over it, new connections get "no route to host" (ICMP admin-prohibited). Headroom ~300–640. Bursty GitHub or scraping failures: check this first.
-- Merge-map backfills run themselves (the owner, 2026-10-26 "yes auto"): after a deploy that changes the canonical merge map, the worker runs `canonical-merge` once; a standing OK for that class only, other prod writes still wait for him.
+- Reviewed name lists apply themselves (the owner's "yes auto": merge map 2026-10-26, identity catalog 2026-10-29): after a deploy that changes one, the worker runs `canonical-merge` or `entity-identities --apply` once per version; a standing OK for these two only, other prod writes still wait for him.
 - Long prod jobs: one at a time, with find-gaps pushes held (`.find-gaps/hold-push`): every deploy runs `compose down`, which stops the db and kills any job, one-off container or not (2026-10-22: G460's apply died 53 min in). Three backfills at once OOM-killed the 512 MiB worker; three parallel fetchers failed ~35% of connections (2026-10-05).
 
 ### Running pi
@@ -213,6 +213,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-23…29 — Harness reviews: arg-fixes drops a missing `src` path segment; grep runs patterns rg rejects (rg wrapper, in pi-kit); exit-hang probe found the cause, `lsp-exit` lets pi exit (100 s hang → 5 s); SKILL.md: create `digest.md` when absent (23 misses in 81 mains); `persistent` watches ignore `timeout` (119 hourly expiries); reviews drop wording-only follow-ups (20 of 59). `reviews/2026-10-29.md`
+- 2026-10-29 — G511 AP identity apply (563 articles, run ae27179e; AP 90 d 1,544→1,804); identity-catalog applies made automatic (owner). Merge backfills ran by themselves (G503 4,968 rows, G507 15,386).
 - 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (revoked sign-in token; a 401 now waits 30 min); G460 identity apply on prod (11,129 articles); gh 2.103.0; network re-runs case-sensitive; host `apt` upgrade (Docker 29.9.2, live-restore).
