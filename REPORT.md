@@ -105,7 +105,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - Restart pi-web from a pi-web session only detached: `systemd-run --user --on-active=30 systemctl --user restart pi-web` (a direct restart kills the session).
 - Update: `PATH=/usr/bin:/bin npm i -g @agegr/pi-web@latest && systemctl --user restart pi-web`.
 - systemd never reads `~/.zshenv`: pi-web env goes in the unit file or `~/.config/pi-web/env`.
-- pi-web evicts a session after 10 min idle (`PI_WEB_IDLE_TIMEOUT_MS`); extensions hold it via the `Symbol.for("@agegr/pi-web/session-liveness/v1")` registry (bg-bash does).
+- pi-web evicts a session after 10 min idle (`PI_WEB_IDLE_TIMEOUT_MS`); extensions hold it via the `Symbol.for("@agegr/pi-web/session-liveness/v1")` registry (bg-bash does). A watch-held session keeps old extension code: `/reload` it.
 - Never read or print `~/.pi/agent/auth.json`, `~/.config/pi-web/env`, `~/.codex/auth.json`. Pass the pi-web password to curl from inside `bash -c`.
 - Missing todo panel in pi-web: reload. The `rpiv-todos` button is bottom-left, under the input.
 
@@ -212,7 +212,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-23…29 — Harness reviews: arg-fixes drops a missing `src` path segment; grep runs patterns rg rejects (rg wrapper, in pi-kit); exit-hang probe found the cause, `lsp-exit` lets pi exit (100 s hang → 5 s); SKILL.md: create `digest.md` when absent (23 misses in 81 mains); `persistent` watches ignore `timeout` (119 hourly expiries); reviews drop wording-only follow-ups (20 of 59). `reviews/2026-10-29.md`
+- 2026-10-23…30 — Harness reviews: arg-fixes `src` paths; rg wrapper; `lsp-exit` (100 s hang → 5 s); create `digest.md` when absent; `persistent` watches ignore `timeout`; reviews drop wording follow-ups; loop tools tell lenses by thinking level (659 were "builders"). `reviews/2026-10-30.md`
 - 2026-10-29 — G511 AP identity apply (563 articles, run ae27179e; AP 90 d 1,544→1,804); identity-catalog applies made automatic (owner, G527 live). Merge backfills ran by themselves (G503 4,968 rows, G507 15,386). Loop stopped 11:44 at the owner's request ($241 run, c407–c433).
 - 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
