@@ -6,7 +6,7 @@ Log of the user's pi setup: what is installed, why, and what was tried.
 
 This section is the source of truth; the sections below explain how it got here.
 
-**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore runs on `anthropic/claude-sonnet-5-5`, the reviewer and the advisor on `anthropic/claude-opus-5-5` (2026-10-21, the user: no Fable; off GPT since 10-18); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18), elsewhere `explore-glm` is off; the loop's env.sh puts `~/.local/node26` first (c351, G441: prod's Node 26), so loop sessions run pi on Node 26, everything else on Node 24; no local Gemma, no desktop notifications. ImageMagick 7 in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (runner screenshots, stub tests). See `AGENTS.md` "This copy".
+**On the Pi (`loop` user, since 2026-10-04)** the table's laptop setup differs: Explore runs on `anthropic/claude-sonnet-5-5`, the reviewer and the advisor on `anthropic/claude-opus-5-5` (2026-10-21, the user: no Fable; off GPT since 10-18); Z.AI only in the loop's sessions (`ZAI_API_KEY` from its env.sh enables a project copy of `explore-glm`, 2026-10-18; `FG_SUBAGENT_MODEL=zai/glm-5.3` there moves the loop's Explore, builder and reviewer sub-agents to GLM-5.3, 2026-10-31), elsewhere `explore-glm` is off; the loop's env.sh puts `~/.local/node26` first (c351, G441: prod's Node 26), so loop sessions run pi on Node 26, everything else on Node 24; no local Gemma, no desktop notifications. ImageMagick 7 in `~/.local/opt/imagemagick`, wrapper `~/bin/magick` (runner screenshots, stub tests). See `AGENTS.md` "This copy".
 
 | Role | How it is wired |
 |---|---|
@@ -213,6 +213,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-10-23…31 — Harness reviews: arg-fixes `src` paths; rg wrapper; `lsp-exit` (100 s hang → 5 s); `digest.md` created when absent; `persistent` watches ignore `timeout`; no wording follow-ups; loop tools tell sub-agents by thinking level (659 lenses, 646 builders misfiled). `reviews/2026-10-31.md`
+- 2026-10-31 — Loop sub-agents on GLM-5.3 (the user): runner `FG_SUBAGENT_MODEL` writes git-excluded project copies of Explore/builder/reviewer; cycles and the runner's reviews stay Opus. Subs were 27 % of the last run ($65 of $241); stub test + mutant. Restarted at c434.
 - 2026-10-29 — G511 AP identity apply (563 articles, run ae27179e; AP 90 d 1,544→1,804); identity-catalog applies made automatic (owner, G527 live). Merge backfills ran by themselves (G503 4,968 rows, G507 15,386). Loop stopped 11:44 at the owner's request ($241 run, c407–c433).
 - 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
