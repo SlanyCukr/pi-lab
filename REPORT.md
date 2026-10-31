@@ -212,7 +212,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
-- 2026-10-23…30 — Harness reviews: arg-fixes `src` paths; rg wrapper; `lsp-exit` (100 s hang → 5 s); create `digest.md` when absent; `persistent` watches ignore `timeout`; reviews drop wording follow-ups; loop tools tell lenses by thinking level (659 were "builders"). `reviews/2026-10-30.md`
+- 2026-10-23…31 — Harness reviews: arg-fixes `src` paths; rg wrapper; `lsp-exit` (100 s hang → 5 s); `digest.md` created when absent; `persistent` watches ignore `timeout`; no wording follow-ups; loop tools tell sub-agents by thinking level (659 lenses, 646 builders misfiled). `reviews/2026-10-31.md`
 - 2026-10-29 — G511 AP identity apply (563 articles, run ae27179e; AP 90 d 1,544→1,804); identity-catalog applies made automatic (owner, G527 live). Merge backfills ran by themselves (G503 4,968 rows, G507 15,386). Loop stopped 11:44 at the owner's request ($241 run, c407–c433).
 - 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
