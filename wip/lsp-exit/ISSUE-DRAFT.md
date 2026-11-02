@@ -1,4 +1,4 @@
-Draft for apmantza/pi-lens (follow-up to #4554, which is closed). Not posted; the user decides.
+Posted 2026-11-02 as https://github.com/apmantza/pi-lens/issues/5169 (follow-up to #4554; still present in 4.4.8).
 
 ---
 
