@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, fixGrepPattern, fixSrcPath, placeholderProblem, rgParses, tabProblem } from "./index.ts";
+import { spawn, spawnSync } from "node:child_process";
+import { controlCharProblem, dropPlaceholders, fixCrEscapes, fixEscapedEdits, fixGrepPattern, fixPgrepSelfMatch, fixSrcPath, placeholderProblem, rgParses, tabProblem } from "./index.ts";
 import { tmpdir } from "node:os";
 const D = mkdtempSync(`${tmpdir()}/argfix-`);
 // Run: node test.ts (Node >= 23 strips the types)
@@ -154,4 +155,88 @@ ok(fixGrepPattern({ pattern: 7 }) === undefined && fixGrepPattern({}) === undefi
 let calls = 0;
 fixGrepPattern({ pattern: "plain words only" }, () => (calls++, true));
 ok(calls === 0, "grep: no rg spawn for a pattern without ( [ { ? * +");
+// 8 pgrep -f / pkill -f patterns that match their own command
+const pg = (command: string) => { const i: any = { command }; const note = fixPgrepSelfMatch(i); return { command: i.command, note }; };
+const pgCases: [string, string][] = [
+  [`timeout 1800 bash -c 'until grep -qE "passed|failed|error" /tmp/fg-c464-fullpytest.log 2>/dev/null && ! pgrep -f "fg_full_py" >/dev/null; do sleep 15; done'; tail -5 /tmp/x.log`,
+   `timeout 1800 bash -c 'until grep -qE "passed|failed|error" /tmp/fg-c464-fullpytest.log 2>/dev/null && ! pgrep -f "[f]g_full_py" >/dev/null; do sleep 15; done'; tail -5 /tmp/x.log`],
+  [`until ! pgrep -f "ci-job.sh mm_c83ci" >/dev/null; do sleep 20; done`, `until ! pgrep -f "[c]i-job.sh mm_c83ci" >/dev/null; do sleep 20; done`],
+  [`while pgrep -u loop -f "next build" >/dev/null; do sleep 5; done`, `while pgrep -u loop -f "[n]ext build" >/dev/null; do sleep 5; done`],
+  [`pgrep -fc "while True: pass"; uptime`, `pgrep -fc "[w]hile True: pass"; uptime`],
+  [`pkill -f 'next start -p 3111'; sleep 2`, `pkill -f '[n]ext start -p 3111'; sleep 2`],
+  [`pkill -9 -f fetch5.py; sleep 1`, String.raw`pkill -9 -f \[f\]etch5.py; sleep 1`],
+  [`pgrep -f "c217/g235.*run.sh|./run.sh" >/dev/null`, `pgrep -f "[c]217/g235.*run.sh|./[r]un.sh" >/dev/null`],
+  [`pgrep -af -- 'python3 sweep'`, `pgrep -af -- '[p]ython3 sweep'`],
+  [`pgrep --full -u loop "probe x"`, `pgrep --full -u loop "[p]robe x"`],
+];
+for (const [given, want] of pgCases) {
+  const r = pg(given);
+  ok(r.command === want && !!r.note && r.note.includes("ran as"), `pgrep ${given.slice(0, 60)} -> ${r.command === want ? "ok" : r.command}`);
+}
+for (const same of [
+  `pgrep -f "[p]robe_day_text_judge"`, // already bracketed
+  `pgrep -f "run\\.sh"`, // the regex needs "run.sh", the command has "run\\.sh"
+  `pgrep -u loop next`, // no -f: matches process names only
+  `pgrep -f "$PAT"`, // expansion: unknown text
+  `pgrep -fl`, // no pattern
+  `ps aux | grep pgrep`, // not a call
+  `python3 -c "import subprocess; subprocess.run(['pgrep','-f','x'])"`, // not shell words
+  `pgrep -F /tmp/x.pid`, // pidfile, no -f
+  `pgrep -af '^python3 sweep'`, // ^ anchors at the start of the shell's own command line
+]) {
+  const r = pg(same);
+  ok(r.command === same && r.note === undefined, `pgrep untouched: ${same}`);
+}
+const hd = "cat > /tmp/t.py <<'EOF'\ncases = ['pgrep -f \"abc_y\"']\nEOF\npgrep -f \"fg_full_py\" >/dev/null";
+ok(pg(hd).command === hd.replace('pgrep -f \"fg_full_py\" >/dev/null', 'pgrep -f \"[f]g_full_py\" >/dev/null'), "heredoc body untouched, command after it rewritten");
+const hd2 = "python3 - <<EOF\nprint('pgrep -f \"abc_x\"')\nEOF";
+ok(pg(hd2).command === hd2 && pg(hd2).note === undefined, "heredoc only: untouched, no note");
+// review 2026-11-03: quoted text is not code; option corner cases
+for (const same of [
+  "echo '- Never poll a running ci-job with `pgrep -f \"ci-job.sh mm\"` inside a bash loop' >> README.md",
+  'git commit -m "loop: wait with pgrep -f fg_full_py before tail"',
+  "git commit -m \"use pgrep -f 'fg_x' to wait\"",
+  "python3 -c \"import os; os.system('pkill -f fg_x >/dev/null')\"",
+  "cat > /tmp/s.sh <<\\EOF\npkill -f fg_x\nEOF",
+  "pgrep -fx 'sleep 30'",
+  "ssh h 'pgrep -f fg_x'",
+  "echo x # pgrep -f fg_x",
+  "echo pgrep -f fg_x >> notes.txt",
+]) {
+  const r = pg(same);
+  ok(r.command === same && r.note === undefined, `pgrep untouched: ${same.slice(0, 50)}`);
+}
+ok(pg("pkill -f -q 5 fg_x").command === String.raw`pkill -f -q 5 \[f\]g_x`, "pkill -q takes a value");
+ok(pg("pkill -f --queue 5 fg_x").command === String.raw`pkill -f --queue 5 \[f\]g_x`, "pkill --queue takes a value");
+const ri = pg("pgrep -if fg_x; echo FG_X");
+ok(ri.command === "pgrep -if fg_x; echo FG_X" && !!ri.note && ri.note.includes("-A"), "-i: FG_X elsewhere still matches, note only");
+for (const [given, want] of [
+  ["P=$(pgrep -f fg_x); echo $P", String.raw`P=$(pgrep -f \[f\]g_x); echo $P`],
+  ["kill $(pgrep -f 'fg_x') 2>/dev/null", "kill $(pgrep -f '[f]g_x') 2>/dev/null"],
+  ["timeout -k 5 60 nohup pgrep -f fg_x", String.raw`timeout -k 5 60 nohup pgrep -f \[f\]g_x`],
+  ["if pgrep -f fg_x >/dev/null 2>&1; then echo y; fi", String.raw`if pgrep -f \[f\]g_x >/dev/null 2>&1; then echo y; fi`],
+  ["bash -lc 'while pgrep -f fg_x; do sleep 1; done'", String.raw`bash -lc 'while pgrep -f \[f\]g_x; do sleep 1; done'`],
+  ["sh -c \"pgrep -f fg_x\"", String.raw`sh -c "pgrep -f \[f\]g_x"`],
+]) {
+  const r = pg(given);
+  ok(r.command === want, `command position: ${given} -> ${r.command}`);
+}
+let r8 = pg(`pgrep -f fg_x; cat /tmp/fg_x.log`);
+ok(r8.command === `pgrep -f fg_x; cat /tmp/fg_x.log`, "pattern elsewhere in the command: unchanged");
+ok(!!r8.note && r8.note.includes("kill -0"), "pattern elsewhere: note says to wait on the PID");
+ok(pg(`pgrep -f "a.*"`).note === undefined || true, "no crash on short patterns");
+ok(pg(`pgrep -f "x|.*"`).note?.includes("kill -0") === true, "alternative without a letter: note only");
+ok(pg(`pgrep -f "(unclosed"`).note === undefined || pg(`pgrep -f "(unclosed"`).command === `pgrep -f "(unclosed"`, "bad regex: untouched");
+// real shell: the rewritten command finds the target, not itself
+const mark = `argfix_${process.pid}`;
+const sleeper = spawn("sleep", ["30"], { argv0: `${mark}_target`, stdio: "ignore" });
+const tpid = String(sleeper.pid);
+for (const cmd of [`pgrep -f "${mark}_target"; true`, `bash -c 'pgrep -f "${mark}_target"'; true`, `pgrep -f "${mark}_none" || echo none`]) {
+  const before = spawnSync("bash", ["-c", cmd], { encoding: "utf8" }).stdout.trim().split("\n");
+  const fixed = pg(cmd).command;
+  const after = spawnSync("bash", ["-c", fixed], { encoding: "utf8" }).stdout.trim().split("\n");
+  const want = cmd.includes("_none") ? ["none"] : [tpid];
+  ok(JSON.stringify(after) === JSON.stringify(want) && JSON.stringify(before) !== JSON.stringify(want), `real shell: ${fixed} -> ${after} (before ${before})`);
+}
+sleeper.kill();
 process.exit(fail);

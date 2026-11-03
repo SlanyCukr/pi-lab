@@ -56,6 +56,15 @@
  *    `~/.pi/agent/bin/rg` wrapper (`rg-wrapper.sh`) runs such patterns with `--engine=auto` (PCRE2), and the check
  *    below goes through the same wrapper.
  *
+ * 8. `pgrep -f`/`pkill -f` patterns that match their own command. The bash tool runs `bash -c <command>`, so a pattern
+ *    written in the command is also in that shell's command line (and in any `timeout … bash -c` around it): pgrep
+ *    finds the shell itself, `until ! pgrep -f X` never ends, and `pkill -f X` kills the shell (exit 143). find-gaps to
+ *    2026-11-02: 14 blocking waits ran to their timeout (about 5 h; c464 waited 81 min on three full pytest runs of
+ *    5-9 min each), more ran on in the background. When the pattern matches the command, one letter of each `|`
+ *    alternative is bracketed (`fg_full_py` -> `[f]g_full_py`): the same processes match, the command text no longer
+ *    does. Only calls at command position count, also inside a `bash -c '...'` script; quoted text (a commit message,
+ *    an `echo` into a README) and heredoc bodies stay as written. The result starts with a note.
+ *
  * `tool_call` handlers may mutate `event.input` before the tool runs (no re-validation follows);
  * the assistant message in the session keeps what the model wrote, so the prompt cache is not
  * touched.
@@ -295,6 +304,225 @@ export function fixGrepPattern(input: any, parses: (p: string) => boolean = rgPa
 	return `Note: rg cannot parse ${literal.join(", ")} as a regex, so this call searched it as literal text: pattern ${JSON.stringify(pattern)}.`;
 }
 
+const VALUE_SHORT = new Set(["u", "U", "g", "G", "P", "s", "t", "F", "d", "r", "O", "q"]);
+const VALUE_LONG = /^--(signal|ns|nslist|older|pidfile|delimiter|pgroup|group|parent|session|terminal|euid|uid|runstates|env|cgroup|queue)$/;
+const SIGNAL = /^-(\d+|(SIG)?[A-Z]{2,}\d*)$/;
+const KEYWORDS = new Set(["do", "then", "else", "elif", "if", "while", "until", "time", "!", "{"]);
+const WRAPPERS = new Set(["timeout", "nohup", "nice", "setsid", "exec", "env", "command", "xargs", "stdbuf", "sudo"]);
+type Tok = { start: number; end: number; raw: string; value: string; kind: "single" | "double" | "bare" | "mixed" };
+type Call = { at: number; tool: string; to: number };
+
+/** End of the shell word that starts at `i` (quotes and backslashes kept inside it). */
+function wordEnd(cmd: string, i: number, to: number): number {
+	while (i < to && !/[\s;&|()<>`]/.test(cmd[i]) && !(cmd[i] === "$" && cmd[i + 1] === "(")) {
+		if (cmd[i] === "'") {
+			const c = cmd.indexOf("'", i + 1);
+			i = c < 0 || c >= to ? to : c + 1;
+		} else if (cmd[i] === '"') {
+			let j = i + 1;
+			while (j < to && cmd[j] !== '"') j += cmd[j] === "\\" ? 2 : 1;
+			i = Math.min(j + 1, to);
+		} else i += cmd[i] === "\\" ? 2 : 1;
+	}
+	return i;
+}
+
+/** `pgrep`/`pkill` calls at command position in cmd[from, to), also inside `bash -c '...'` scripts; quoted text is not code. */
+function procCalls(cmd: string, from = 0, to = cmd.length, out: Call[] = []): Call[] {
+	let i = from;
+	let atCmd = true;
+	let wrapper = false;
+	let shell: "" | "seen" | "c" = "";
+	while (i < to) {
+		const ch = cmd[i];
+		if (ch === " " || ch === "\t") i++;
+		else if (ch === "\\" && cmd[i + 1] === "\n") i += 2;
+		else if (ch === "#" && (i === from || /\s/.test(cmd[i - 1]))) {
+			const nl = cmd.indexOf("\n", i);
+			i = nl < 0 || nl > to ? to : nl;
+		} else if (ch === "<" || ch === ">") {
+			while (i < to && /[<>&]/.test(cmd[i])) i++;
+			while (cmd[i] === " ") i++;
+			i = wordEnd(cmd, i, to); // the redirection target
+		} else if (/[;&|(){}\n`]/.test(ch) || (ch === "$" && cmd[i + 1] === "(")) {
+			atCmd = true;
+			wrapper = false;
+			shell = "";
+			i += ch === "$" ? 2 : 1;
+		} else {
+			const s = i;
+			i = wordEnd(cmd, i, to);
+			const w = cmd.slice(s, i);
+			if (shell === "c") {
+				const q = w[0];
+				const inner = w.slice(1, -1);
+				if (w.length > 1 && (q === "'" || q === '"') && w.endsWith(q) && !inner.includes(q) && !(q === '"' && /[\\$`]/.test(inner)))
+					procCalls(cmd, s + 1, i - 1, out);
+				shell = "";
+			} else if (shell === "seen") {
+				if (/^-\w*c\w*$/.test(w)) shell = "c";
+				else if (!w.startsWith("-")) shell = "";
+			} else if (atCmd) {
+				if (KEYWORDS.has(w) || /^[A-Za-z_]\w*=/.test(w) || (wrapper && (w.startsWith("-") || /^\d/.test(w)))) continue;
+				if (WRAPPERS.has(w)) {
+					wrapper = true;
+					continue;
+				}
+				atCmd = false;
+				wrapper = false;
+				if (w === "pgrep" || w === "pkill") out.push({ at: s, tool: w, to });
+				else if (w === "bash" || w === "sh") shell = "seen";
+			}
+		}
+	}
+	return out;
+}
+
+/** Shell words from `from` to the end of the simple command (or `to`). */
+function words(cmd: string, from: number, to: number): Tok[] {
+	const out: Tok[] = [];
+	let i = from;
+	while (i < to) {
+		while (cmd[i] === " " || cmd[i] === "\t" || (cmd[i] === "\\" && cmd[i + 1] === "\n")) i += cmd[i] === "\\" ? 2 : 1;
+		if (i >= to || /[;&|()<>\n`]/.test(cmd[i])) break;
+		const start = i;
+		let value = "";
+		const kinds = new Set<string>();
+		while (i < to && !/[\s;&|()<>`]/.test(cmd[i])) {
+			const q = cmd[i];
+			if (q === "'" || q === '"') {
+				const close = cmd.indexOf(q, i + 1);
+				if (close < 0 || close >= to) return out; // unbalanced: leave the command alone
+				value += cmd.slice(i + 1, close);
+				kinds.add(q === "'" ? "single" : "double");
+				i = close + 1;
+			} else {
+				value += q;
+				kinds.add("bare");
+				i++;
+			}
+		}
+		const kind = kinds.size === 1 ? ([...kinds][0] as Tok["kind"]) : "mixed";
+		out.push({ start, end: i, raw: cmd.slice(start, i), value, kind });
+	}
+	return out;
+}
+
+/** The pattern word of a `pgrep`/`pkill` call that uses `-f` (not `-x`, which cannot match a shell), and whether `-i` is set. */
+function fullPattern(toks: Tok[]): { tok: Tok; icase: boolean } | undefined {
+	let full = false;
+	let icase = false;
+	let exact = false;
+	const done = (tok: Tok | undefined) => (full && !exact && tok ? { tok, icase } : undefined);
+	for (let j = 0; j < toks.length; j++) {
+		const v = toks[j].value;
+		if (v === "--") return done(toks[j + 1]);
+		if (v.startsWith("--")) {
+			if (v === "--full") full = true;
+			else if (v === "--ignore-case") icase = true;
+			else if (v === "--exact") exact = true;
+			else if (VALUE_LONG.test(v)) j++;
+			continue;
+		}
+		if (v.length > 1 && v.startsWith("-")) {
+			if (SIGNAL.test(v)) continue;
+			for (let k = 1; k < v.length; k++) {
+				if (v[k] === "f") full = true;
+				else if (v[k] === "i") icase = true;
+				else if (v[k] === "x") exact = true;
+				else if (VALUE_SHORT.has(v[k])) {
+					if (k === v.length - 1) j++; // value in the next word, else attached
+					break;
+				}
+			}
+			continue;
+		}
+		return done(toks[j]);
+	}
+	return undefined;
+}
+
+/** Brackets the first plain letter or digit of each `|` alternative; undefined when an alternative has none. */
+function bracketed(pattern: string): { text: string; at: number[] } | undefined {
+	if (/[[({]/.test(pattern)) return undefined;
+	const at: number[] = [];
+	let altStart = 0;
+	for (let k = 0; k <= pattern.length; k++) {
+		if (k < pattern.length && !(pattern[k] === "|" && pattern[k - 1] !== "\\")) continue;
+		const alt = pattern.slice(altStart, k);
+		const m = /(?<!\\)[A-Za-z0-9_]/.exec(alt);
+		if (!m) return undefined;
+		at.push(altStart + m.index);
+		altStart = k + 1;
+	}
+	let text = pattern;
+	for (const a of [...at].reverse()) text = `${text.slice(0, a)}[${text[a]}]${text.slice(a + 1)}`;
+	return { text, at };
+}
+
+const matches = (pattern: string, text: string, icase = false) => {
+	try {
+		return new RegExp(pattern, icase ? "i" : "").test(text);
+	} catch {
+		return false;
+	}
+};
+
+/** Rewrites `pgrep -f`/`pkill -f` patterns that match the command's own text; returns the note, or undefined. Exported for the test. */
+export function fixPgrepSelfMatch(input: any): string | undefined {
+	const cmd = input?.command;
+	if (typeof cmd !== "string" || !/\b(pgrep|pkill)\b/.test(cmd)) return undefined;
+	const edits: { tok: Tok; raw: string; tool: string; icase: boolean }[] = [];
+	const stuck: string[] = [];
+	// Heredoc bodies are file contents or another program's input (a test case, a script being written): left as written.
+	const bodies: [number, number][] = [];
+	for (const h of cmd.matchAll(/<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/g)) {
+		const from = cmd.indexOf("\n", h.index);
+		if (from < 0) continue;
+		const end = new RegExp(`\\n${h[1] ? "\\t*" : ""}${h[3]}(\\n|$)`).exec(cmd.slice(from));
+		bodies.push([from, end ? from + end.index + end[0].length : cmd.length]);
+	}
+	for (const call of procCalls(cmd)) {
+		if (bodies.some(([a, b]) => call.at > a && call.at < b)) continue;
+		const found = fullPattern(words(cmd, call.at + call.tool.length, call.to));
+		if (!found) continue;
+		const { tok, icase } = found;
+		if (tok.kind === "mixed" || /[$`]/.test(tok.value) || !matches(tok.value, cmd, icase)) continue;
+		const b = bracketed(tok.value);
+		const inner = tok.raw.slice(1, -1);
+		const usable =
+			b &&
+			(tok.kind === "single" || (tok.kind === "double" && !/\\[\\"$`\n]/.test(inner)) || (tok.kind === "bare" && !tok.raw.includes("\\")));
+		if (!usable) {
+			stuck.push(`${call.tool} -f ${tok.raw}`);
+			continue;
+		}
+		const shift = tok.kind === "bare" ? 0 : 1;
+		const [open, close] = tok.kind === "bare" ? ["\\[", "\\]"] : ["[", "]"];
+		let raw = tok.raw;
+		for (const a of [...b.at].reverse()) raw = `${raw.slice(0, a + shift)}${open}${raw[a + shift]}${close}${raw.slice(a + shift + 1)}`;
+		edits.push({ tok, raw, tool: call.tool, icase });
+	}
+	let next = cmd;
+	for (const e of [...edits].reverse()) next = next.slice(0, e.tok.start) + e.raw + next.slice(e.tok.end);
+	const notes: string[] = [];
+	for (const e of edits) {
+		if (matches(e.tok.value, next, e.icase)) stuck.push(`${e.tool} -f ${e.tok.raw}`);
+		else notes.push(`${e.tool} -f ${e.tok.raw} ran as ${e.tool} -f ${e.raw}`);
+	}
+	if (notes.length > 0) input.command = next;
+	const out: string[] = [];
+	if (notes.length > 0)
+		out.push(
+			`Note: ${notes.join("; ")}. The pattern also matched this command's own shell, whose command line contains it, so a wait on it would never end; the bracketed form matches the same processes.`,
+		);
+	if (stuck.length > 0)
+		out.push(
+			`Note: ${stuck.join("; ")} also matches this command's own shell (its command line contains the pattern), so a wait on it never ends and pkill would stop the shell. Add -A (--ignore-ancestors: skips this shell and its wrappers, but also any ancestor such as the runner) or wait on the PID (\`while kill -0 PID\`).`,
+		);
+	return out.length > 0 ? out.join("\n") : undefined;
+}
+
 export default function (pi: ExtensionAPI) {
 	const pathNotes = new Map<string, string>();
 	pi.on("tool_result", (event: any) => {
@@ -320,6 +548,11 @@ export default function (pi: ExtensionAPI) {
 				(event.toolName === "edit" ? (placeholderProblem(input) ?? tabProblem(input, cwd)) : undefined) ??
 				controlCharProblem(event.toolName, input, cwd);
 			return reason ? { block: true, reason } : undefined;
+		}
+		if (event.toolName === "bash") {
+			const note = fixPgrepSelfMatch(input);
+			if (note !== undefined && typeof event.toolCallId === "string") pathNotes.set(event.toolCallId, note);
+			return undefined;
 		}
 		dropPlaceholders(event?.toolName, input);
 		return undefined;
