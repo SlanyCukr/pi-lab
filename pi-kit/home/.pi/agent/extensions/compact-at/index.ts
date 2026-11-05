@@ -16,11 +16,20 @@
 // background children ("stopped - user request"; reproduced 2026-09-20). Compaction is deferred until the
 // running set is empty. If a terminal event were ever missed the set would stay non-empty and this extension
 // would simply stay quiet, which is the safe direction.
+//
+// Compact on return (harness review 2026-11-05): a user message after more than PI_COMPACT_IDLE_MIN (65) minutes idle
+// finds the 1 h prompt cache expired, so its turn re-writes the whole context at the 1 h write price (2x input).
+// 40 such turns over 150k tokens in 30 days cost $87.53 (11-04 09:45: 371,751 tokens, $3.01). When the context
+// is over PI_COMPACT_IDLE_TOKENS (150k), the message waits for a compaction first: pi serializes the older history
+// with tool output cut short (test: 1,459 summary input tokens for a 49k context, no cache write), and the turn and
+// the turns after it carry the summary plus the last ~20k tokens instead of the whole history.
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const PERCENT = Number(process.env.PI_COMPACT_AT_PERCENT ?? 40);
 const FIXED_TOKENS = process.env.PI_COMPACT_AT_TOKENS ? Number(process.env.PI_COMPACT_AT_TOKENS) : undefined; // test hook
 const DEBUG = !!process.env.PI_COMPACT_AT_DEBUG;
+const IDLE_MS = Number(process.env.PI_COMPACT_IDLE_MIN ?? 65) * 60_000;
+const IDLE_TOKENS = Number(process.env.PI_COMPACT_IDLE_TOKENS ?? 150_000);
 
 const INSTRUCTIONS = [
 	"Preserve exactly: the user's goal and standing instructions; decisions made and the reason for each;",
@@ -39,6 +48,8 @@ export default function (pi: ExtensionAPI) {
 	// After a compaction, stay quiet until context has grown well past what compaction left behind,
 	// so a summary that is itself above the limit cannot cause a loop.
 	let suppressBelow = 0;
+	// Time of the last provider response, for the idle check; 0 until this process saw a turn (then read from the session).
+	let lastTurnAt = 0;
 
 	const log = (msg: string) => DEBUG && console.error(`[compact-at] ${msg}`);
 
@@ -54,18 +65,63 @@ export default function (pi: ExtensionAPI) {
 		isChild = typeof event?.systemPrompt === "string" && event.systemPrompt.includes("<active_agent name=");
 	});
 
-	pi.on("turn_end", (event: any, ctx: ExtensionContext) => {
-		// Two independent child checks: the fork's <active_agent name=...> tag, and the ask_parent/notify_parent
-		// tools it installs in every child session.
-		if (!isChild) {
-			try {
-				const active = pi.getActiveTools();
-				if (active.includes("notify_parent") || active.includes("ask_parent")) isChild = true;
-			} catch (e: any) {
-				log(`getActiveTools failed: ${e?.message}`); // best effort: the systemPrompt check above still applies
-			}
+	// Two independent child checks: the fork's <active_agent name=...> tag (before_agent_start above), and the
+	// ask_parent/notify_parent tools it installs in every child session.
+	const checkChild = () => {
+		if (isChild) return true;
+		try {
+			const active = pi.getActiveTools();
+			if (active.includes("notify_parent") || active.includes("ask_parent")) isChild = true;
+		} catch (e: any) {
+			log(`getActiveTools failed: ${e?.message}`); // best effort: the systemPrompt check still applies
 		}
-		if (isChild) {
+		return isChild;
+	};
+
+	const lastAssistantAt = (ctx: ExtensionContext) => {
+		const branch = ctx.sessionManager.getBranch();
+		for (let k = branch.length - 1; k >= 0; k--) {
+			const e: any = branch[k];
+			if (e?.type === "message" && e.message?.role === "assistant") return Date.parse(e.timestamp) || 0;
+		}
+		return 0;
+	};
+
+	pi.on("input", async (event: any, ctx: ExtensionContext) => {
+		if (event?.source === "extension" || event?.streamingBehavior || running || !ctx.hasUI || checkChild()) return { action: "continue" };
+		const last = lastTurnAt || lastAssistantAt(ctx);
+		const idle = last ? Date.now() - last : 0;
+		const tokens = ctx.getContextUsage()?.tokens;
+		log(`input: idle=${Math.round(idle / 1000)}s tokens=${tokens}`);
+		if (idle <= IDLE_MS || tokens == null || tokens <= IDLE_TOKENS || runningAgents.size > 0) return { action: "continue" };
+		running = true;
+		try {
+			ctx.ui.notify(`Compacting first: ${Math.round(tokens / 1000)}k tokens after ${Math.round(idle / 60_000)} min idle (the prompt cache expired)`, "info");
+		} catch (e: any) {
+			log(`notify failed: ${e?.message}`);
+		}
+		await new Promise<void>((resolve) =>
+			ctx.compact({
+				customInstructions: INSTRUCTIONS,
+				onComplete: (result: any) => {
+					const after = result?.estimatedTokensAfter ?? result?.tokensAfter;
+					if (typeof after === "number") suppressBelow = Math.floor(after * 1.5);
+					log(`idle compaction done after=${after}`);
+					resolve();
+				},
+				onError: (error: any) => {
+					log(`idle compaction failed: ${error?.message}`); // the message still goes out, on the full context
+					resolve();
+				},
+			}),
+		);
+		running = false;
+		return { action: "continue" };
+	});
+
+	pi.on("turn_end", (event: any, ctx: ExtensionContext) => {
+		lastTurnAt = Date.now();
+		if (checkChild()) {
 			log("child session: inert");
 			return;
 		}
