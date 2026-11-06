@@ -27,7 +27,8 @@ Global npm packages: `npm i -g --prefix ~/.npm-global …`. A bare `-g` from a p
 Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `bg-bash`: background bash, sub-agent hand-off, `monitor: true`/`persistent` watches, `/loop` + `schedule_wakeup` + `loop` tool, pi-web liveness hold; `pi-bg-wait`/`pi-bg-stop` at the start or end of a `&&`/`;` chain run in order, `&&` honoured (`index.ts`, `loop.ts`, `mixed.ts`).
 - `cache-ttl`: 1 h prompt cache, main session. Its wake-up system-prompt pin is inactive on pi 1.2.0 (fixed there). Since 2026-10-16 it folds mid-conversation system messages into one head, so a pi-lens `context` injection after a tool change no longer flips the prompt (`PI_SYSTEM_FOLD=0` off; test `node wip/cache-ttl/test.mjs`).
-- `compact-at`: compact at 40 %; also on return after 65+ min idle at 150k+ tokens. `hide-tools`: hides `pi_lens_activate_tools`.
+- `compact-at`: compact at 40 %; also on return after 65+ min idle at 150k+ tokens (outcome in a `compact-at-idle` session entry). `hide-tools`: hides `pi_lens_activate_tools`.
+- `ext-fresh` (2026-11-06): on a code change under `extensions/` or `local-packages/`, the next pi-web session loads the new code (test `node wip/ext-fresh/test.mjs off`).
 - `lsp-exit` (2026-10-27): unrefs vscode-jsonrpc's partial-message timer (bundled in pi-lens), which re-arms forever after an LSP server stops mid-message and kept a finished `pi -p` alive (test `node wip/lsp-exit/test.mjs`).
 - `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args; decodes `\uXXXX` escapes in `edit` text; blocks `edit`/`write` text with a stray control character, a tab the file lacks, or a placeholder `newText` (`x`, `unused`); repairs a CR before `uXXXX`; maps a missing `read`/`grep`/`find`/`ls` path to the one existing path without a `src` segment, noted in the result. A `grep` alternative rg cannot parse is searched as literal text, noted; `~/.pi/agent/bin/rg` wraps `rg.real`, adding `--engine=auto` for look-around (`wip/arg-fixes/rg-wrapper.sh`). A `bash` `pgrep -f`/`pkill -f` pattern that matches its own command gets one letter bracketed (`[f]oo`), noted.
 - `auto-continue`: on in interactive pi; an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`.
@@ -52,12 +53,11 @@ Removed since the original install: `@vanillagreen/pi-claude-bridge`, `@tintinwe
 
 Reviewed 2026-09-23.
 
-1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key) and gotgenes/pi-packages#962 (tool list relocation on pi ≥0.86); local patches cover both, notes next to them in `wip/`. Drop each local patch when its fix ships: switch the settings entry back to `npm:` and delete the local copy.
-2. The `context7` docs tool went away with the old extension and nothing replaces it; `web_search`/`fetch_content` cover docs lookups.
-3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-4. **Exit hang:** the runner's `event loop:` probe (10-26) named the cause in c403: vscode-jsonrpc's partial-message timer; `lsp-exit` (10-27) unrefs it. Confirmed: 0 `did not exit` in 16 cycles after it (was 51 in 406). Upstream note: `wip/lsp-exit/ISSUE-DRAFT.md`, not posted.
+1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key); the local patch covers it (`wip/`). When the fix ships, switch the settings entry back to `npm:` and delete the local copy.
+2. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
+3. pi-web's pi 1.2.0 caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
 
-Closed 2026-09-23: usage check (fine), backup deleted.
+Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit hang (`lsp-exit`, 0 hangs in 16 cycles, 10-29).
 
 ## How to work here (gotchas)
 
@@ -145,7 +145,7 @@ Closed 2026-09-23: usage check (fine), backup deleted.
 - **`PI_CACHE_RETENTION` unset** (2026-09-20): it would move sub-agents to 1 h; bg-bash's 240 s hand-off keeps their 5 min cache warm.
 - **Advisor session-id patch** (2026-09-17): repeat calls 0 → ~21k cached tokens, 0.21 → 0.025 USD.
 - **No per-turn prompt rewrites**: payload byte-identical between turns (verified for `tool-groups`, `arg-fixes`, #962 patch). Built-in `cacheWarming` fired twice ever (09-23).
-- **`compact-at` at 40 %** (2026-09-20): pi ignored `compaction.modelOverrides`; one `reserveTokens` cannot fit 1M and 272k windows. Inert in children and (since 09-28) print/JSON mode, where its abort killed `pi -p` runs. Since 11-05 also on return after 65+ min idle at 150k+ tokens (cold re-writes: $87.53/30 d).
+- **`compact-at` at 40 %** (2026-09-20): pi ignored `compaction.modelOverrides`; one `reserveTokens` cannot fit 1M and 272k windows. Inert in children and print mode. Since 11-05 also on return after 65+ min idle at 150k+ tokens (cold re-writes: $87.53/30 d).
 - **`compaction.reserveTokens` 65536** (2026-09-29): summaries may use 0.8 × reserve (13,107 at the default, thinking included); they reached 11.5–12.5K and failed with "hit the token cap". A test used 15.8K.
 - **Auto-retry 8 tries, 3 s base** (2026-09-20): defaults covered 14 s; one session lost 2.4 h. `retry.provider.maxRetries` stays 0 (can swallow usage-limit errors).
 - **Tool-call compression not built** (2026-09-20): summaries cost ~$8/session; `billion-context-pi` cancels all compaction. Worth building: model-free clearing of old results when the cache is cold.
@@ -215,10 +215,10 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.
-- 2026-10-08…11-05 — Daily harness reviews (05:00): arg-fixes `src` paths, rg wrapper, `lsp-exit`, `persistent` ignores `timeout`, `class_note`, builder `Not fixed:`, `pgrep -f` self-match, `tool-audit.py` error lines; 11-05: `compact-at` compacts on return after 65+ min idle (cold turns $87.53/30 d). `reviews/<date>.md`
+- 2026-10-08…11-06 — Daily harness reviews (05:00; every change in `reviews/changes.md`). 11-06: `ext-fresh` (pi-web ran 11-02 extension code, so 11-05's compact-on-return never fired: $3.15). `reviews/<date>.md`
 - 2026-10-31 — Loop sub-agents on GLM-5.3 (the user): runner `FG_SUBAGENT_MODEL` writes project copies of the agents (off again 11-02); `FG_SUBAGENT_CONCURRENCY` 2. Restarted at c439 with owner projects Reach and Trust.
-- 2026-10-29 — G511 AP identity apply (563 articles, run ae27179e; AP 90 d 1,544→1,804); identity-catalog applies made automatic (owner, G527 live). Merge backfills ran by themselves (G503 4,968 rows, G507 15,386). Loop stopped 11:44 at the owner's request ($241 run, c407–c433).
-- 2026-10-26 — G489 site simplification live (Týden, Redakce, Aktéři merged, 3-group nav); G491/G492 backfill 2,348 + 548 rows; G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60). Runner: `requests` timeouts re-run.
+- 2026-10-29 — G511 AP identity apply (563 articles); identity-catalog applies automatic (G527). Loop stopped 11:44 at the owner's request ($241, c407–c433).
+- 2026-10-26 — G489 site simplification live (3-group nav); G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60).
 - 2026-10-25 — Loop restarted at c380 (stopped since 10-22). Host power cut 10-23 08:40–15:00, prod recovered. Sonnet builder kept (0/13 fails). `reap_cycle` keeps podman's pause process.
 - 2026-10-22 — Loop down 17:28–18:28 (revoked sign-in token; a 401 now waits 30 min); G460 identity apply on prod (11,129 articles); gh 2.103.0; network re-runs case-sensitive; host `apt` upgrade (Docker 29.9.2, live-restore).
 - 2026-10-21 — Advisor audit kept; no Fable (the user): reviewer, gate and advisor → `claude-opus-5-5`; reviews use a 5-min cache; `builder` → Sonnet 5.5 (trial, kept 10-23).

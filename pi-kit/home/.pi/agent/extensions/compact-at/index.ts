@@ -23,6 +23,9 @@
 // is over PI_COMPACT_IDLE_TOKENS (150k), the message waits for a compaction first: pi serializes the older history
 // with tool output cut short (test: 1,459 summary input tokens for a 49k context, no cache write), and the turn and
 // the turns after it carry the summary plus the last ~20k tokens instead of the whole history.
+// Each return after the idle limit leaves a `compact-at-idle` custom entry in the session (never sent to the model):
+// idle minutes, tokens, and compacted / skipped with the reason / failed with the error (harness review 2026-11-06:
+// on 11-05 a 22 h return at 389k tokens re-wrote the cache for $3.15 and left no trace of why it did not compact).
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const PERCENT = Number(process.env.PI_COMPACT_AT_PERCENT ?? 40);
@@ -88,34 +91,58 @@ export default function (pi: ExtensionAPI) {
 	};
 
 	pi.on("input", async (event: any, ctx: ExtensionContext) => {
-		if (event?.source === "extension" || event?.streamingBehavior || running || !ctx.hasUI || checkChild()) return { action: "continue" };
+		if (event?.source === "extension" || !ctx.hasUI || checkChild()) return { action: "continue" };
 		const last = lastTurnAt || lastAssistantAt(ctx);
 		const idle = last ? Date.now() - last : 0;
+		if (idle <= IDLE_MS) return { action: "continue" };
 		const tokens = ctx.getContextUsage()?.tokens;
-		log(`input: idle=${Math.round(idle / 1000)}s tokens=${tokens}`);
-		if (idle <= IDLE_MS || tokens == null || tokens <= IDLE_TOKENS || runningAgents.size > 0) return { action: "continue" };
+		const record = (outcome: string, extra: Record<string, unknown> = {}) => {
+			log(`input: idle=${Math.round(idle / 1000)}s tokens=${tokens} ${outcome}`);
+			try {
+				pi.appendEntry("compact-at-idle", { idleMin: Math.round(idle / 60_000), tokens, outcome, ...extra });
+			} catch (e: any) {
+				log(`appendEntry failed: ${e?.message}`);
+			}
+		};
+		const skip = event?.streamingBehavior ? "agent running" : running ? "compaction running" : tokens == null ? "context size unknown"
+			: tokens <= IDLE_TOKENS ? "under the token limit" : runningAgents.size > 0 ? "sub-agents running" : "";
+		if (skip) {
+			record(`skipped: ${skip}`);
+			return { action: "continue" };
+		}
 		running = true;
 		try {
-			ctx.ui.notify(`Compacting first: ${Math.round(tokens / 1000)}k tokens after ${Math.round(idle / 60_000)} min idle (the prompt cache expired)`, "info");
+			try {
+				ctx.ui.notify(`Compacting first: ${Math.round(tokens! / 1000)}k tokens after ${Math.round(idle / 60_000)} min idle (the prompt cache expired)`, "info");
+			} catch (e: any) {
+				log(`notify failed: ${e?.message}`);
+			}
+			await new Promise<void>((resolve) =>
+				ctx.compact({
+					customInstructions: INSTRUCTIONS,
+					onComplete: (result: any) => {
+						const after = result?.estimatedTokensAfter ?? result?.tokensAfter;
+						if (typeof after === "number") suppressBelow = Math.floor(after * 1.5);
+						record("compacted", { tokensAfter: after });
+						resolve();
+					},
+					onError: (error: any) => {
+						// the message still goes out, on the full context; say so, since that turn re-writes the whole cache
+						record("failed", { error: String(error?.message ?? error) });
+						try {
+							ctx.ui.notify(`Compacting first failed (${error?.message}); your message goes out on the full context`, "warning");
+						} catch (e: any) {
+							log(`notify failed: ${e?.message}`);
+						}
+						resolve();
+					},
+				}),
+			);
 		} catch (e: any) {
-			log(`notify failed: ${e?.message}`);
+			record("failed", { error: String(e?.message ?? e) }); // ctx.compact threw before starting
+		} finally {
+			running = false; // a throw must not leave the 40 % trigger disabled for the rest of the session
 		}
-		await new Promise<void>((resolve) =>
-			ctx.compact({
-				customInstructions: INSTRUCTIONS,
-				onComplete: (result: any) => {
-					const after = result?.estimatedTokensAfter ?? result?.tokensAfter;
-					if (typeof after === "number") suppressBelow = Math.floor(after * 1.5);
-					log(`idle compaction done after=${after}`);
-					resolve();
-				},
-				onError: (error: any) => {
-					log(`idle compaction failed: ${error?.message}`); // the message still goes out, on the full context
-					resolve();
-				},
-			}),
-		);
-		running = false;
 		return { action: "continue" };
 	});
 
