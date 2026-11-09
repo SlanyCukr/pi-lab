@@ -28,6 +28,12 @@
  * (answered by the tool, like `pi-bg-wait`) stops a monitor, background command or loop quietly.
  * Being part of `bash`, monitors stay under the permission policy's bash rules.
  *
+ * Polls (main session): a foreground command that starts with `sleep N` (N >= 30, an optional `cd dir &&` before it)
+ * while a handed-off command of this session runs is a poll of that command, so the sleep ends as soon as one of them
+ * finishes; that command's result goes into this call's result (no separate message), then the rest of the command
+ * runs. 2026-10-10..11-09: 156 of 306 such sleeps ran while a handed-off command ran, 16 kept sleeping after it had
+ * ended (53 min), and a pi-web session sat blocked through 26 of them (151 min). Measure: `poll-audit.py SINCE`.
+ *
  * Loops (loop.ts): `/loop`, `schedule_wakeup` and the `loop` tool, on the same queue. Their ticks
  * are user messages, sent one per idle moment and never in the same flush as other messages.
  *
@@ -81,6 +87,9 @@ const jobId = (id: string) => (/^\d+$/.test(id) ? `bg${id}` : id);
 const WAIT_CHAIN = new RegExp(CD_PREFIX + String.raw`(pi-bg-wait\s+(?:bg)?\d+(?:\s*&&\s*pi-bg-wait\s+(?:bg)?\d+)+)\s*$`);
 // only in command position with an id, so `grep pi-bg-wait index.ts` or `echo 'pi-bg-wait bg1'` still run
 const MIXED_WAIT = /(^|&&|\|\||;|\|)\s*pi-bg-(wait|stop)\s+(bg|loop)?\d+\b/;
+// a leading `sleep N` that is a poll: group 1 the optional `cd` prefix, group 2 the seconds
+const POLL_SLEEP = new RegExp(String.raw`^(\s*(?:cd\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)\s*(?:&&|;)\s*)?)sleep\s+(\d+)\s*(?:;|&&|\n|$)`);
+const POLL_MIN_S = 30;
 // monitors: batching, flood stop, line and buffer caps, expiry
 const MONITOR_BATCH_MS = 1000;
 const MONITOR_FLOOD_LINES = 120; // per rolling minute
@@ -958,6 +967,52 @@ export default function (pi: ExtensionAPI) {
 					throw new Error(lead + (e instanceof Error ? e.message : String(e)));
 				}
 			};
+
+			// A poll (see the header): sleep in here, so a handed-off command that finishes ends the sleep.
+			const poll = !monitor && !background && !child && !lead ? POLL_SLEEP.exec(rest.command ?? "") : null;
+			const pollSeconds = poll ? Number(poll[2]) : 0;
+			const watched =
+				poll && pollSeconds >= POLL_MIN_S && (rest.timeout == null || rest.timeout > pollSeconds)
+					? [...running].filter((job) => job.handedOff && !job.monitor && !job.result && !job.terminating)
+					: [];
+			if (poll && watched.length) {
+				const started = Date.now();
+				let wake: () => void = () => {};
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				let onAbort: (() => void) | undefined;
+				// a waiter takes the result itself: finish() queues no message for these jobs meanwhile
+				for (const job of watched) job.waiters++;
+				try {
+					await new Promise<void>((resolve, reject) => {
+						wake = resolve;
+						timer = setTimeout(resolve, pollSeconds * 1000);
+						for (const job of watched) job.onDone.push(resolve);
+						onAbort = () => reject(new Error("Command aborted"));
+						if (signal?.aborted) onAbort();
+						else signal?.addEventListener("abort", onAbort, { once: true });
+					});
+				} finally {
+					for (const job of watched) {
+						job.waiters--;
+						const at = job.onDone.indexOf(wake);
+						if (at >= 0) job.onDone.splice(at, 1);
+					}
+					if (timer) clearTimeout(timer);
+					if (onAbort) signal?.removeEventListener("abort", onAbort);
+				}
+				// every job that finished while we waited, also one in the same instant as the timer
+				const done = watched.filter((job) => job.result);
+				const slept = Math.round((Date.now() - started) / 1000);
+				const after = rest.command.slice(poll[0].length).trim();
+				if (done.length) {
+					const ids = done.map((job) => job.id).join(", ");
+					lead = `Note: the sleep ended after ${slept}s of ${pollSeconds}s because ${ids} finished; its result is below, and no separate message will come.\n\n${done.map((job) => collected(job)).join("\n\n")}`;
+					if (!after) return { content: [{ type: "text", text: lead }], details: undefined as any };
+					lead += `\n\n== ${after}\n`;
+				} else if (!after) return { content: [{ type: "text", text: "(no output)" }], details: undefined as any };
+				rest.command = poll[1] + after;
+				if (rest.timeout != null) rest.timeout = Math.max(1, rest.timeout - slept);
+			}
 
 			if (monitor) {
 				if (child) throw new Error("monitor works in the main session only: a sub-agent's run ends before its events could arrive.");
