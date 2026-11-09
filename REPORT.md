@@ -10,7 +10,7 @@ This section is the source of truth; the sections below explain how it got here.
 
 | Role | How it is wired |
 |---|---|
-| Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.4 (no version pin; see AGENTS.md) |
+| Default main session | `anthropic/claude-fable-5-2` (2026-11-09, the user; Opus 5.5 before; also the loop's cycles and the harness review, which use the default), thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.4 (no version pin; see AGENTS.md) |
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-opus-5-5` (2026-10-21; Fable 5.1 from 10-18, GPT before), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
@@ -213,7 +213,7 @@ Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit han
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-11-09 — pi 1.4.0 → 1.5.0, pi-lens 4.4.11, subagents 25.0.5, web-access 0.47.0, auth 3.4.4, todo 2.15.0, advisor 2.15.0 (+ our prompt), pi-web 0.15.0 (13 scratch checks first); `lsp-exit` removed; `tool-trim` hides the new params; kit pin 0.99.1 → 1.5.0. Rollback `wip/pi-update-1.5/rollback.sh`.
-- 2026-11-09 — Claude Fable 5.2 added via `models.json` (not in pi 1.5.0); real turn with a tool call works on the subscription login. Roles unchanged.
+- 2026-11-09 — Claude Fable 5.2 added via `models.json` (not in pi 1.5.0); real turn with a tool call works on the subscription login. Same day: the user made it the default main model (loop cycles and harness review follow; sub-agents and advisor keep their own).
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild pi-kit/home/ from the live setup on this machine.
 # Never copies secrets (auth.json, models-store.json, web-push.json, sessions, caches)
-# or machine-specific files (models.json, code-intel.json, pi-web state).
+# or machine-specific files (code-intel.json, pi-web state); from models.json only the anthropic models list.
 # Provider names are replaced with placeholders that install.sh fills in:
 #   {{SUB_PROVIDER}}  -> github-copilot | openai-codex | openai
 #   {{SUB_PLAN}}      -> GitHub Copilot | Codex | ChatGPT
@@ -54,6 +54,10 @@ node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8").replace(
 
 # Settings: drop per-machine UI state
 jq 'del(.lastChangelogVersion)' "$A/settings.json" > "$OUT/.pi/agent/settings.json"
+# Anthropic models pi does not list yet (Fable 5.2, the default model since 2026-11-09); other providers stay local
+if [ -f "$A/models.json" ] && jq -e '.providers.anthropic.models | length > 0' "$A/models.json" > /dev/null; then
+  jq '{"$schema": ."$schema", providers: {anthropic: {models: .providers.anthropic.models}}}' "$A/models.json" > "$OUT/.pi/agent/models.json"
+fi
 cp "$A/web-search.json" "$OUT/.pi/agent/"
 cp "$A/npm/package.json" "$OUT/.pi/agent/npm/"
 

@@ -1,6 +1,6 @@
 {
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-5-5",
+  "defaultModel": "claude-fable-5-2",
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "defaultThinkingLevel": "high",
