@@ -91,8 +91,8 @@ let p: any = { action: "update", id: 1, status: "completed", activeForm: "null",
 ok(dropPlaceholders("todo", p) === 3 && JSON.stringify(p) === '{"action":"update","id":1,"status":"completed"}', "todo update: null subject/description/activeForm dropped");
 p = { action: "create", subject: "Fix login", description: "None", activeForm: "fixing login" };
 ok(dropPlaceholders("todo", p) === 1 && p.subject === "Fix login" && p.activeForm === "fixing login" && !("description" in p), "todo create: real text kept");
-p = { source: "lsp", scope: "paths", paths: ["a.ts"], path: "null", mode: "full" };
-ok(dropPlaceholders("lens_diagnostics", p) === 1 && !("path" in p) && p.mode === "full", "lens_diagnostics: null path dropped");
+p = { source: "lsp", scope: "paths", paths: ["a.ts"], path: "null", severity: "null", mode: "full" };
+ok(dropPlaceholders("lens_diagnostics", p) === 2 && !("path" in p) && !("severity" in p) && p.mode === "full", "lens_diagnostics: null path and severity dropped");
 p = { subagent_type: "Explore", thinking: "undefined", model: "", prompt: "null" };
 ok(dropPlaceholders("subagent", p) === 2 && p.prompt === "null", "subagent: only listed fields");
 p = { path: "null", content: "null" };

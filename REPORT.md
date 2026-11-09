@@ -2,7 +2,7 @@
 
 Log of the user's pi setup: what is installed, why, and what was tried.
 
-## Current setup (as of 2026-10-24, pi 1.4.0)
+## Current setup (as of 2026-11-09, pi 1.5.0)
 
 This section is the source of truth; the sections below explain how it got here.
 
@@ -10,16 +10,16 @@ This section is the source of truth; the sections below explain how it got here.
 
 | Role | How it is wired |
 |---|---|
-| Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.3 (no version pin; see AGENTS.md) |
+| Default main session | `anthropic/claude-opus-5-5`, thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.4 (no version pin; see AGENTS.md) |
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-opus-5-5` (2026-10-21; Fable 5.1 from 10-18, GPT before), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
 | Builder sub-agent `builder` | `anthropic/claude-sonnet-5-5` (since 2026-10-21, kept 10-23; was Opus 5.5), thinking medium, edit tools + pi-lens diagnostics/LSP |
 | Advisor tool | `anthropic/claude-opus-5-5` (Claude subscription; Fable 10-17..21), effort high, `~/.config/rpiv-advisor/advisor.json` |
 
-Packages (`~/.pi/agent/settings.json`; updated 2026-10-22 with pi 1.4.0, `wip/pi-update-1.4/`): `@gotgenes/pi-anthropic-auth` 3.4.3, `@gotgenes/pi-subagents` 25.0.1 (tool `subagent`; stops a sub-agent at `max_turns`),
-`@gotgenes/pi-permission-system` 40.3.0 pinned (41 loosens external_directory asks; `pi update --extensions` rewrites it to ^41, so update with `npm i` in `~/.pi/agent/npm`) from npm (our #962 fix upstream since 33.1.0; 40.x also matches an absolute rule against a relative path, hence six work-tree `rm -rf` allow rules), `@juicesharp/rpiv-todo` 2.13.9,
-`pi-web-access` 0.44.0, `pi-lens` 4.4.4, and the patched advisor `~/.pi/agent/local-packages/rpiv-advisor` (upstream 2.13.8, which strips tool declarations for pi ≥ 1.0, plus our session-id cache fix for rpiv-mono#236, WebSocket cleanup and prompt edit; diffs, switch and rollback scripts in `wip/pi-update-1.2/`).
+Packages (`~/.pi/agent/settings.json`; updated 2026-11-09 with pi 1.5.0, `wip/pi-update-1.5/`): `@gotgenes/pi-anthropic-auth` 3.4.4, `@gotgenes/pi-subagents` 25.0.5 (tool `subagent`; stops a sub-agent at `max_turns`),
+`@gotgenes/pi-permission-system` 40.3.0 pinned (41 loosens external_directory asks, 42 only adds a zod bump we already have; `pi update --extensions` rewrites it to ^42, so update with `npm i` in `~/.pi/agent/npm`) from npm (our #962 fix upstream since 33.1.0; 40.x also matches an absolute rule against a relative path, hence six work-tree `rm -rf` allow rules), `@juicesharp/rpiv-todo` 2.15.0 (its `tasks[]` batch create hidden by `tool-trim`),
+`pi-web-access` 0.47.0, `pi-lens` 4.4.11, and the advisor `~/.pi/agent/local-packages/rpiv-advisor` (upstream 2.15.0, which now has our session-id and WebSocket fixes, plus only our prompt `prompts/advisor-system.txt`; diff, switch and rollback scripts in `wip/pi-update-1.5/`).
 `~/.pi/agent/npm/package.json` `allowScripts` (npm 11): `@ast-grep/cli`, `esbuild` allowed (install or check their binaries); `protobufjs`, `@google/genai`, `tree-sitter-bash` denied (no-op, warning only, or a prebuilt linux-arm64 binary).
 Global npm packages: `npm i -g --prefix ~/.npm-global …`. A bare `-g` from a pi-web shell installs into `~/.local/node`, first on the units' PATH but not in `pi-web.service`.
 `settings.json` also: `"shellCommandPrefix": "unset NODE_ENV"` (pi-web's Next.js server sets `NODE_ENV=production`, and every bash command inherited it); retry `{"enabled": true, "maxRetries": 8, "baseDelayMs": 3000}` (12.7 min of backoff); `warnings.anthropicExtraUsage: false`.
@@ -29,8 +29,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `cache-ttl`: 1 h prompt cache, main session. Its wake-up system-prompt pin is inactive on pi 1.2.0 (fixed there). Since 2026-10-16 it folds mid-conversation system messages into one head, so a pi-lens `context` injection after a tool change no longer flips the prompt (`PI_SYSTEM_FOLD=0` off; test `node wip/cache-ttl/test.mjs`).
 - `compact-at`: compact at 40 %; also on return after 65+ min idle at 150k+ tokens (outcome in a `compact-at-idle` session entry). `hide-tools`: hides `pi_lens_activate_tools`.
 - `ext-fresh` (2026-11-06): on a code change under `extensions/` or `local-packages/`, the next pi-web session loads the new code (test `node wip/ext-fresh/test.mjs off`).
-- `lsp-exit` (2026-10-27): unrefs vscode-jsonrpc's partial-message timer (bundled in pi-lens), which re-arms forever after an LSP server stops mid-message and kept a finished `pi -p` alive (test `node wip/lsp-exit/test.mjs`).
-- `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args; decodes `\uXXXX` escapes in `edit` text; blocks `edit`/`write` text with a stray control character, a tab the file lacks, or a placeholder `newText` (`x`, `unused`); repairs a CR before `uXXXX`; maps a missing `read`/`grep`/`find`/`ls` path to the one existing path without a `src` segment, noted in the result. A `grep` alternative rg cannot parse is searched as literal text, noted; `~/.pi/agent/bin/rg` wraps `rg.real`, adding `--engine=auto` for look-around (`wip/arg-fixes/rg-wrapper.sh`). A `bash` `pgrep -f`/`pkill -f` pattern that matches its own command gets one letter bracketed (`[f]oo`), noted.
+- `arg-fixes`: drops `"null"` placeholders in `subagent`, `todo` and `lens_diagnostics` free-text args (`severity` too since 2026-11-09: pi-lens 4.4.9 rejects it); decodes `\uXXXX` escapes in `edit` text; blocks `edit`/`write` text with a stray control character, a tab the file lacks, or a placeholder `newText` (`x`, `unused`); repairs a CR before `uXXXX`; maps a missing `read`/`grep`/`find`/`ls` path to the one existing path without a `src` segment, noted in the result. A `grep` alternative rg cannot parse is searched as literal text, noted; `~/.pi/agent/bin/rg` wraps `rg.real`, adding `--engine=auto` for look-around (`wip/arg-fixes/rg-wrapper.sh`). A `bash` `pgrep -f`/`pkill -f` pattern that matches its own command gets one letter bracketed (`[f]oo`), noted.
 - `auto-continue`: on in interactive pi; an offer ending gets "go with your pick", read-only after a question, ≤ 3 per message; `/auto off`, `PI_AUTO_CONTINUE=manual|0`.
 - `tool-groups`: collapsed tool rows, thinking display omitted; marks `edit`/`write`/`read` sequential, so a message with one runs its calls in order.
 - `tool-trim`: short tool descriptions, unused optional params hidden, "Available tools:" list and pi-lens skills dropped in Anthropic, Codex, chat and (since 2026-10-15) OpenAI Responses requests; `PI_TOOL_TRIM=0` off; test `node wip/tool-trim/test.mjs`.
@@ -41,23 +40,22 @@ Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean since 2026-09-24;
 
 Public repo: `~/pi-lab` is `github.com/SlanyCukr/pi-lab` (since 2026-10-05; no loop, no session data). Portable copy `pi-kit/`: `export.sh` snapshots this setup, `install.sh --sub copilot|codex|openai` installs it, `server/` installs a headless host, `box/` has a Docker image and a credential-free test. See its README and "Decisions: portable kit".
 
-Browser UI: `@agegr/pi-web` 0.12.2 (pins pi 1.2.0, nested under it since the CLI went to 1.4.0, so web sessions run 1.2.0), user service `~/.config/systemd/user/pi-web.service` on `127.0.0.1:30141`,
+Browser UI: `@agegr/pi-web` 0.15.0 (pins pi 1.5.0, the same version as the CLI), user service `~/.config/systemd/user/pi-web.service` on `127.0.0.1:30141`,
 public through a Cloudflare tunnel since 2026-10-04 (URL in `AGENTS.override.md`, not in git); password in `~/.config/pi-web/env`. See "Decisions: pi-web".
 find-gaps loop and its run page (board): user units on the Pi; host details in `AGENTS.override.md`. Setup: `wip/find-gaps/DESIGN.md` (not in git).
 
 Lab tool: `pi -e ~/pi-lab/update-lab/wire-probe.ts` with `WIRE_PROBE_OUT=/tmp/wire.jsonl` logs each Anthropic request body (no headers); diff two runs for prompt-cache changes.
 
-Removed since the original install: `@vanillagreen/pi-claude-bridge`, `@tintinweb/pi-subagents`, `pi-workspace-history`, `@plannotator/pi-extension`, the hand-rolled `plan-billing` extension (archive deleted), `gsd-pi`.
+Removed since the original install: `@vanillagreen/pi-claude-bridge`, `@tintinweb/pi-subagents`, `pi-workspace-history`, `@plannotator/pi-extension`, the hand-rolled `plan-billing` extension (archive deleted), `gsd-pi`, `lsp-exit` (2026-11-09: pi-lens 4.4.9 fixed the exit hang upstream; dev copy `wip/lsp-exit/`).
 
 ## Open items
 
 Reviewed 2026-09-23.
 
-1. **Upstream, waiting:** rpiv-mono#236 (advisor cache key); the local patch covers it (`wip/`). When the fix ships, switch the settings entry back to `npm:` and delete the local copy.
-2. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-3. pi-web's pi 1.2.0 caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
+1. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
+2. pi-web's pi caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
 
-Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit hang (`lsp-exit`, 0 hangs in 16 cycles, 10-29).
+Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit hang (`lsp-exit`, 0 hangs in 16 cycles, 10-29; upstream in pi-lens 4.4.9); rpiv-mono#236 (upstream in advisor 2.15.0, 11-09).
 
 ## How to work here (gotchas)
 
@@ -162,6 +160,7 @@ Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit han
 - **`arg-fixes`** (2026-09-23): fixes `"null"` optional args in `event.input` (stored message and cache stay); non-ASCII escapes in newText decoded (10-08: 20 of 29 failed loop edits). Test `node wip/arg-fixes/test.ts`.
 
 ### Advisor
+- **Local copy = upstream + our prompt** (2026-11-09): 2.15.0 ships our session-id and WebSocket fixes; the prompt (Recommendation/Why/Main risk format) has no config hook, so the package stays local.
 - **Shutdown cleanup** (2026-09-23): a cached Codex WebSocket made `pi -p` hang ~300 s after an advisor call; now 15–19 s.
 - **Call only when stuck** (2026-09-18): the default made Luna call it before a one-line edit (19 s → 300 s timeout). Fixed output format; transcript is evidence, not instructions.
 - **Quirk**: on tiny prompts Astra sometimes answered with a tool call ("no text content"); real calls fine.
@@ -212,6 +211,7 @@ Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit han
 
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
+- 2026-11-09 — pi 1.4.0 → 1.5.0, pi-lens 4.4.11, subagents 25.0.5, web-access 0.47.0, auth 3.4.4, todo 2.15.0, advisor 2.15.0 (+ our prompt), pi-web 0.15.0 (13 scratch checks first); `lsp-exit` removed; `tool-trim` hides the new params; kit pin 0.99.1 → 1.5.0. Rollback `wip/pi-update-1.5/rollback.sh`.
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.

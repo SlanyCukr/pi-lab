@@ -10,7 +10,6 @@
  * preserved verbatim from rpiv-pi@7525a5d.
  */
 
-import { cleanupSessionResources } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	registerAdvisorBeforeAgentStart,
@@ -19,7 +18,7 @@ import {
 	registerAdvisorTool,
 	registerModelSelectHandler,
 	registerThinkingLevelSelectHandler,
-} from "./advisor/index.js";
+} from "./advisor/index.ts";
 
 export default function (pi: ExtensionAPI) {
 	registerAdvisorTool(pi);
@@ -28,12 +27,4 @@ export default function (pi: ExtensionAPI) {
 	registerModelSelectHandler(pi);
 	registerThinkingLevelSelectHandler(pi);
 	registerAdvisorSessionStart(pi);
-
-	// Local fix (pairs with the rpiv-mono#236 sessionId patch in execute.ts): the advisor's
-	// own `advisor-<id>` session makes openai-codex cache a WebSocket with a 5-minute ref'd
-	// idle timer. pi only cleans up the main session id on shutdown, so without this a
-	// `pi -p` run that used the advisor stays alive ~5 min after finishing. Idempotent.
-	pi.on("session_shutdown", (_event, ctx) => {
-		cleanupSessionResources(`advisor-${ctx.sessionManager.getSessionId()}`);
-	});
 }

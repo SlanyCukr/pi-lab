@@ -1,0 +1,9 @@
+pi 1.4.0
+pi-web 0.12.2
+rpiv-advisor 2.13.8
+pi-lens 4.4.4
+@gotgenes/pi-subagents 25.0.1
+@gotgenes/pi-permission-system 40.3.0
+pi-web-access 0.44.0
+@gotgenes/pi-anthropic-auth 3.4.3
+@juicesharp/rpiv-todo 2.13.9

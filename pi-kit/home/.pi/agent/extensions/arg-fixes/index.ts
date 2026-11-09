@@ -80,7 +80,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 const FIELDS: Record<string, readonly string[]> = {
 	subagent: ["model", "thinking", "resume"],
 	todo: ["subject", "description", "activeForm"],
-	lens_diagnostics: ["path"],
+	lens_diagnostics: ["path", "severity"], // pi-lens >= 4.4.9 rejects an unknown severity; 5 "null" seen by 2026-11-09
 };
 const PLACEHOLDER = /^\s*(null|undefined|none|)\s*$/i;
 

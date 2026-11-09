@@ -104,7 +104,7 @@ const TRIMS: Record<string, Trim> = {
 	lens_diagnostics: {
 		description:
 			'pi-lens diagnostics for paths or the workspace. source "session" reads the cache (empty is not proof of clean); source "lsp" probes the files now. Example: {source: "lsp", scope: "paths", paths: ["src/app.ts"]}.',
-		drop: ["analysisRoot", "refreshRunners", "concurrency", "includeGenerated", "maxLspFiles", "maxProjectFiles", "serverScope"],
+		drop: ["file", "filePath", "analysisRoot", "refreshRunners", "concurrency", "includeGenerated", "maxLspFiles", "maxProjectFiles", "serverScope"],
 		params: {
 			severity: "Lowest severity shown: error, warning, information, hint, all (default).",
 			source: "session (cache) or lsp (active probe).",
@@ -113,7 +113,7 @@ const TRIMS: Record<string, Trim> = {
 		},
 	},
 	lsp_navigation: {
-		drop: ["callHierarchyItem", "command", "commandArguments", "apply", "newFilePath", "kinds", "topLevelOnly", "endLine", "endCharacter"],
+		drop: ["file", "filePath", "view", "callHierarchyItem", "command", "commandArguments", "apply", "newFilePath", "kinds", "topLevelOnly", "endLine", "endCharacter"],
 		params: {
 			operation:
 				"definition, typeDefinition, declaration, references, hover, signatureHelp, documentSymbol, findSymbol, workspaceSymbol, implementation, rename (preview), codeAction, workspaceDiagnostics.",
@@ -137,7 +137,8 @@ const TRIMS: Record<string, Trim> = {
 	todo: {
 		description:
 			"Task list for multi-step work. Actions: create, update (status or fields), list, get, delete, clear. Status: pending, in_progress, completed (or deleted).",
-		drop: ["metadata", "owner", "includeDeleted", "blockedBy", "addBlockedBy", "removeBlockedBy"],
+		// tasks: rpiv-todo 2.15 batch create; parallel create calls do the same without the nested schema
+		drop: ["metadata", "owner", "includeDeleted", "blockedBy", "addBlockedBy", "removeBlockedBy", "tasks"],
 		params: {
 			status: "pending, in_progress, completed or deleted; with list, a filter.",
 			activeForm: "Spinner label while in_progress, e.g. 'writing tests'.",
@@ -199,6 +200,9 @@ const GUIDELINES: Record<string, string> = {
 	"- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls": "",
 	"- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.": "",
 	"- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.": "",
+	// pi 1.5.0 wording of the same two edit rules (the edit description above already says them)
+	"- Use edit for targeted changes. Batch changes to one file in a single call.": "",
+	"- Each edits[].oldText must exactly and uniquely match the original file. Keep matches short and non-overlapping; merge nearby changes without including large unchanged regions.": "",
 	"- Be concise in your responses": "",
 	"- Show file paths clearly when working with files": "",
 };

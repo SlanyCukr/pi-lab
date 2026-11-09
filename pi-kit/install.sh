@@ -7,7 +7,7 @@
 # Existing files that would be overwritten are backed up to ~/.pi-kit-backup-<timestamp>/.
 set -euo pipefail
 
-PI_VERSION="0.99.1" # local patches and extensions were verified against this version (live since 2026-09-29)
+PI_VERSION="1.5.0" # local patches and extensions were verified against this version (live since 2026-11-09)
 SUB="copilot"
 INSTALL_PI=0
 FILES_ONLY=0
