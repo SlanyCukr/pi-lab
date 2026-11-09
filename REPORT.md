@@ -36,7 +36,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `pi-permission-system/config.json`: allow by default, `yoloMode: true`, deny dotenv files, `~/.ssh`, the pi and Codex credential files, `rm -rf` outside `/tmp`.
 
 Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean since 2026-09-24; dev copy `wip/token-audit/APPEND_SYSTEM.lean.md`), `~/.pi/agent/agents/*.md` (`general-purpose`/`Plan` off via `enabled: false`), `~/.agents/skills/` (diagnose, grill-me, desloppify, find-gaps; the rest in `~/.agents/skills.disabled/`),
-`~/.pi-lens/config.json` (trimmed tools, hidden widget), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16).
+`~/.pi-lens/config.json` (trimmed tools, hidden widget), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16), `~/.pi/agent/models.json` (adds `anthropic/claude-fable-5-2`, 2026-11-09: released that day, upstream pi commit `0d1793c2` not in 1.5.0; same settings as Fable 5.1, $8/$40).
 
 Public repo: `~/pi-lab` is `github.com/SlanyCukr/pi-lab` (since 2026-10-05; no loop, no session data). Portable copy `pi-kit/`: `export.sh` snapshots this setup, `install.sh --sub copilot|codex|openai` installs it, `server/` installs a headless host, `box/` has a Docker image and a credential-free test. See its README and "Decisions: portable kit".
 
@@ -52,8 +52,9 @@ Removed since the original install: `@vanillagreen/pi-claude-bridge`, `@tintinwe
 
 Reviewed 2026-09-23.
 
-1. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
-2. pi-web's pi caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
+1. When a pi release lists `claude-fable-5-2` itself (`pi --list-models`), delete its entry in `~/.pi/agent/models.json`: the entry replaces the built-in one, which also sets the refusal fallback to Opus 5.
+2. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
+3. pi-web's pi caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
 
 Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit hang (`lsp-exit`, 0 hangs in 16 cycles, 10-29; upstream in pi-lens 4.4.9); rpiv-mono#236 (upstream in advisor 2.15.0, 11-09).
 
@@ -212,6 +213,7 @@ Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit han
 find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `reviews/<date>.md`.
 
 - 2026-11-09 — pi 1.4.0 → 1.5.0, pi-lens 4.4.11, subagents 25.0.5, web-access 0.47.0, auth 3.4.4, todo 2.15.0, advisor 2.15.0 (+ our prompt), pi-web 0.15.0 (13 scratch checks first); `lsp-exit` removed; `tool-trim` hides the new params; kit pin 0.99.1 → 1.5.0. Rollback `wip/pi-update-1.5/rollback.sh`.
+- 2026-11-09 — Claude Fable 5.2 added via `models.json` (not in pi 1.5.0); real turn with a tool call works on the subscription login. Roles unchanged.
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.
