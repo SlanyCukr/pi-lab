@@ -2,7 +2,7 @@
 
 Log of the user's pi setup: what is installed, why, and what was tried.
 
-## Current setup (as of 2026-11-09, pi 1.5.0)
+## Current setup (as of 2026-11-10, pi 1.5.0)
 
 This section is the source of truth; the sections below explain how it got here.
 
@@ -36,7 +36,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `pi-permission-system/config.json`: allow by default, `yoloMode: true`, deny dotenv files, `~/.ssh`, the pi and Codex credential files, `rm -rf` outside `/tmp`.
 
 Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean since 2026-09-24; dev copy `wip/token-audit/APPEND_SYSTEM.lean.md`), `~/.pi/agent/agents/*.md` (`general-purpose`/`Plan` off via `enabled: false`), `~/.agents/skills/` (diagnose, grill-me, desloppify, find-gaps; the rest in `~/.agents/skills.disabled/`),
-`~/.pi-lens/config.json` (trimmed tools, hidden widget), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16), `~/.pi/agent/models.json` (adds `anthropic/claude-fable-5-2`, 2026-11-09: released that day, upstream pi commit `0d1793c2` not in 1.5.0; same settings as Fable 5.1, $8/$40).
+`~/.pi-lens/config.json` (trimmed tools, hidden widget; `contextInjection.retain` since 2026-11-10, so a finding no longer breaks the prompt cache), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16), `~/.pi/agent/models.json` (adds `anthropic/claude-fable-5-2`, 2026-11-09: released that day, upstream pi commit `0d1793c2` not in 1.5.0; same settings as Fable 5.1, $8/$40).
 
 Public repo: `~/pi-lab` is `github.com/SlanyCukr/pi-lab` (since 2026-10-05; no loop, no session data). Portable copy `pi-kit/`: `export.sh` snapshots this setup, `install.sh --sub copilot|codex|openai` installs it, `server/` installs a headless host, `box/` has a Docker image and a credential-free test. See its README and "Decisions: portable kit".
 
@@ -218,7 +218,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.
-- 2026-10-08…11-09 — Daily harness reviews (05:00; every change in `reviews/changes.md`). 11-06: `ext-fresh` (pi-web ran 11-02 extension code: $3.15). 11-07/08: no change (loop stopped since 11-03). 11-09: bg-bash ends a `sleep N` poll when a background command finishes (156 of 306 polls ran during one); compact-on-return proven ($0.50 vs ~$1.40). `reviews/<date>.md`
+- 2026-10-08…11-10 — Daily harness reviews (05:00; every change in `reviews/changes.md`). 11-06: `ext-fresh`. 11-09: bg-bash ends a `sleep N` poll when a background command finishes; compact-on-return proven ($0.50 vs ~$1.40). 11-10: pi-lens `contextInjection.retain` (cycle mains lost $21.75 of $160 to re-written cache); `tool-trim` hides `fetch_content.redirects`. `reviews/<date>.md`
 - 2026-10-31 — Loop sub-agents on GLM-5.3 (the user): runner `FG_SUBAGENT_MODEL` writes project copies of the agents (off again 11-02); `FG_SUBAGENT_CONCURRENCY` 2. Restarted at c439 with owner projects Reach and Trust.
 - 2026-10-29 — G511 AP identity apply (563 articles); identity-catalog applies automatic (G527). Loop stopped 11:44 at the owner's request ($241, c407–c433).
 - 2026-10-26 — G489 site simplification live (3-group nav); G488 deleted 27,040 namesake rows; loop stopped 23:29 at the owner's request ($128.60).

@@ -29,4 +29,11 @@ const u = { input: [{ role: "user", content: sys }] };
 assert.equal(handler({ payload: u }).input[0].content, sys);
 // deterministic: the same payload gives byte-identical output (prompt cache)
 assert.equal(JSON.stringify(handler({ payload: cases.responses })), JSON.stringify(handler({ payload: cases.responses })));
-console.log("tool-trim: all payload shapes trimmed (7 checks)");
+// hidden params leave the schema (and `required`); the others stay. pi-web-access 0.47: fetch_content.redirects, web_search.model
+const prop = (names) => Object.fromEntries(names.map((n) => [n, { type: "string", description: n }]));
+const fetchTool = mod.trimTool({ name: "fetch_content", description: "x", input_schema: { type: "object", properties: prop(["url", "urls", "prompt", "mode", "auth", "proxy", "redirects"]), required: ["url", "redirects"] } });
+assert.deepEqual(Object.keys(fetchTool.input_schema.properties), ["url", "urls", "prompt", "mode"]);
+assert.deepEqual(fetchTool.input_schema.required, ["url"]);
+const searchTool = mod.trimTool({ name: "web_search", description: "x", input_schema: { type: "object", properties: prop(["query", "queries", "category", "provider", "model"]) } });
+assert.deepEqual(Object.keys(searchTool.input_schema.properties), ["query", "queries", "category"]);
+console.log("tool-trim: all payload shapes trimmed, hidden params dropped (10 checks)");

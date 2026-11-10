@@ -37,5 +37,8 @@
   },
   "ui": {
     "hideLspStatus": true
+  },
+  "contextInjection": {
+    "retain": true
   }
 }

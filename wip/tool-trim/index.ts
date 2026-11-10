@@ -86,7 +86,8 @@ const TRIMS: Record<string, Trim> = {
 	web_search: {
 		description:
 			"Search the web (OpenAI, Exa) and return source-linked results. For research, pass 2-4 queries with different angles in queries. includeContent also fetches the full pages in the background.",
-		drop: ["provider", "workflow", "proxy"],
+		// model: only works together with the hidden provider
+		drop: ["provider", "workflow", "proxy", "model"],
 		params: {
 			query: "One search query.",
 			queries: "2-4 queries with different angles, searched concurrently.",
@@ -95,7 +96,9 @@ const TRIMS: Record<string, Trim> = {
 	fetch_content: {
 		description:
 			"Fetch URL(s). mode: readable (default; markdown), raw (exact body), answer (answers prompt from the page only). Handles GitHub repositories, PDFs, images and YouTube transcripts.",
-		drop: ["forceClone", "answerModel", "timestamp", "frames", "model", "auth", "proxy"],
+		// redirects (pi-web-access 0.47): a one-value enum for the hidden auth profiles; Opus filled it with "null",
+		// which pi's validation rejects before any tool_call hook (2 of the first 5 calls, 2026-11-09)
+		drop: ["forceClone", "answerModel", "timestamp", "frames", "model", "auth", "proxy", "redirects"],
 		params: {
 			prompt: "Question for answer mode or a video.",
 			mode: "readable (default), raw or answer.",
