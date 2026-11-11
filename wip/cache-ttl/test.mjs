@@ -70,4 +70,12 @@ assert.equal(removed.messages.at(-1), lens);
 process.env.PI_SYSTEM_FOLD = "0";
 assert.equal(load().context_with_system({ type: "context_with_system", messages: stored }), undefined);
 delete process.env.PI_SYSTEM_FOLD;
-console.log("cache-ttl: 10 checks passed");
+// 8. pi's cache warmer is stopped in the main session (1 h entries outlive its 1 h window), left alone in a sub-agent
+const warmEvent = { type: "cache_warming_decision", warmCost: 0.07, missCost: 1.2, continuationProbability: 1, action: "warm" };
+const warm = load().cache_warming_decision;
+assert.equal(typeof warm, "function", "no cache_warming_decision handler");
+assert.deepEqual(warm(warmEvent), { action: "stop" });
+const childHandlers = {};
+mod.default({ on: (ev, fn) => (childHandlers[ev] = fn), getActiveTools: () => ["read", "ask_parent"] });
+assert.equal(childHandlers.cache_warming_decision(warmEvent), undefined);
+console.log("cache-ttl: 12 checks passed");

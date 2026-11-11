@@ -31,6 +31,13 @@
  * always send the merged form. A session without a tool or prompt change is unchanged; in a real
  * pi-lens run with one, head changes went 14 -> 0, misses 9 -> 5 (all in the first few turns after
  * the change) and cache writes -45 %. Env: PI_SYSTEM_FOLD=0 turns it off.
+ *
+ * No cache warming in the main session (2026-11-11). pi's cache warmer (`cacheWarming`, default "streaming")
+ * re-sends the last request with a one-token cap while a long tool call runs, every 90 % of the TTL it reads
+ * from PI_CACHE_RETENTION: 270 s, since that is unset. It stops one hour after the real request. The main
+ * session's entries are 1 h ones (written here), so every such refresh lands on a live entry and buys nothing:
+ * 575 refreshes in 14 days, all in main sessions, $21.29, while no main-session tool call ran past 60 min.
+ * The main session answers `cache_warming_decision` with "stop"; sub-agents keep pi's decision.
  */
 
 import { getCurrentSystemMessage } from "@earendil-works/pi-ai";
@@ -173,6 +180,9 @@ export default function (pi: ExtensionAPI) {
 		if (!head) return undefined;
 		return { messages: [head, ...messages.filter((m: any) => m?.role !== "system")] };
 	});
+
+	// See the header: a 1 h entry outlives pi's whole warming window, so a refresh only re-reads the context.
+	pi.on("cache_warming_decision", () => (TTL === "1h" && !isChild() ? { action: "stop" } : undefined));
 
 	pi.on("before_provider_request", (event: any) => {
 		const pinnedPayload = pinSystemPrompt(event.payload);

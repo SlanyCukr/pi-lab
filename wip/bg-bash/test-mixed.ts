@@ -51,5 +51,64 @@ same('git commit -m "fix; pi-bg-wait bg2 now waits"', "plain");
 same("date", "plain");
 // a quoted mention next to a real wait: the real one is taken, the quote stays
 same("pi-bg-wait bg1; echo 'then pi-bg-wait bg2'", m({ ops: [w("bg1")], joins: [";"], after: "echo 'then pi-bg-wait bg2'" }));
+
+// Mid-run delivery (index.ts, turn_end): a background result that comes in while a run goes on joins that run at its
+// next turn boundary, not only after agent_end. Loads index.ts with pi's real packages linked into a temp folder.
+{
+	const fs = await import("node:fs");
+	const os = await import("node:os");
+	const path = await import("node:path");
+	const { execFileSync } = await import("node:child_process");
+	const here = path.dirname(new URL(import.meta.url).pathname);
+	const piBin = fs.realpathSync(execFileSync("bash", ["-lc", "command -v pi"], { encoding: "utf8" }).trim());
+	const piPkg = piBin.slice(0, piBin.indexOf("/pi-coding-agent/") + "/pi-coding-agent".length);
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bg-bash-test-"));
+	fs.mkdirSync(path.join(dir, "node_modules", "@earendil-works"), { recursive: true });
+	fs.symlinkSync(piPkg, path.join(dir, "node_modules", "@earendil-works", "pi-coding-agent"));
+	fs.symlinkSync(path.join(piPkg, "node_modules", "typebox"), path.join(dir, "node_modules", "typebox"));
+	for (const f of ["index.ts", "loop.ts", "mixed.ts"]) fs.copyFileSync(path.join(here, f), path.join(dir, f));
+	const mod = await import(path.join(dir, "index.ts"));
+	const handlers: Record<string, Function[]> = {};
+	let tool: any;
+	const sent: string[] = [];
+	const pi: any = {
+		on: (ev: string, fn: Function) => (handlers[ev] ??= []).push(fn),
+		events: { on: () => {}, emit: () => {} },
+		registerTool: (t: any) => (tool = t),
+		registerCommand: () => {},
+		getActiveTools: () => ["bash", "read"],
+		sendMessage: (m: any) => sent.push(m.content),
+		sendUserMessage: () => {},
+		appendEntry: () => {},
+	};
+	mod.default(pi);
+	const ctx: any = { cwd: dir, hasUI: false, isIdle: () => false, sessionManager: { getSessionId: () => "t", getSessionFile: () => undefined } };
+	const fire = (ev: string, e: any = {}) => (handlers[ev] ?? []).map((fn) => fn({ type: ev, ...e }, ctx)).find((r) => r !== undefined);
+	const check = (name: string, ok: boolean, info = "") => {
+		console.log(`${ok ? "ok  " : "FAIL"} ${name}${ok ? "" : ` ${info}`}`);
+		if (!ok) fail++;
+	};
+	fire("session_start", { reason: "startup" });
+	fire("before_agent_start");
+	fire("agent_start");
+	const started = await tool.execute("c1", { command: "echo bgdone-42", background: true }, undefined, () => {}, ctx);
+	check("background start", /Started in the background as bg1/.test(started.content[0].text), JSON.stringify(started.content));
+	await new Promise((r) => setTimeout(r, 1500)); // the command exits while the run goes on
+	check("no message while the run goes on", sent.length === 0, JSON.stringify(sent));
+	const other = { type: "custom", customType: "x", data: {} };
+	const r: any = fire("turn_end", { outcome: "completed", entries: [other], continue: false, toolResults: [] });
+	const entry = r?.entries?.[1];
+	check(
+		"result joins the run at turn_end",
+		r?.continue === true && r.entries[0] === other && entry?.type === "custom_message" && /bg1 finished: exit code 0[\s\S]*bgdone-42/.test(entry.content),
+		JSON.stringify(r),
+	);
+	check("nothing left for the next boundary", fire("turn_end", { outcome: "completed", entries: [] }) === undefined);
+	fire("agent_end");
+	await new Promise((r) => setTimeout(r, 50));
+	check("not sent again at agent_end", sent.length === 0, JSON.stringify(sent));
+	fire("session_shutdown");
+	fs.rmSync(dir, { recursive: true, force: true });
+}
 console.log(fail ? `${fail} FAILED` : "all passed");
 (globalThis as any).process.exit(fail ? 1 : 0);

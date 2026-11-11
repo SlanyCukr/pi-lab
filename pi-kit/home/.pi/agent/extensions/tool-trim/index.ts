@@ -175,6 +175,11 @@ export const trimTool = (tool: Json): Json => {
 
 // "Available tools:" list rendered into the system prompt: one "- name: snippet" line per tool
 const TOOL_LIST = /\n?Available tools:\n(?:- [^\n]*\n)+\n?(?:In addition to the tools above[^\n]*\n\n?)?/;
+// pi >= 1.5 renders the same list as its own `<tools>` section (system-prompt.js buildSections), which the pattern above
+// no longer matched: the list went out again on every request from the 1.5.0 update (2026-11-09) on. The whole section
+// goes, with the blank line that joins it to the section before.
+const TOOLS_SECTION =
+	/(?:\n\n)?<tools>\n(?:- [^\n]*\n)+\n(?:Additional tools may be available\.|In addition to the tools above[^\n]*)\n<\/tools>/;
 // Skills the model should not see. pi-lens re-adds its skills from its extension
 // (`resources_discover`), which pi merges without any settings filter
 // (resource-loader.js extendResources), so they are dropped here instead. They pushed
@@ -209,7 +214,7 @@ const rewriteGuidelines = (text: string): string =>
 		})
 		.join("\n");
 export const trimSystemText = (text: string): string =>
-	rewriteGuidelines(text.replace(TOOL_LIST, "\n").replace(HIDDEN_SKILL, ""));
+	rewriteGuidelines(text.replace(TOOL_LIST, "\n").replace(TOOLS_SECTION, "").replace(HIDDEN_SKILL, ""));
 
 const trimSystem = (payload: Json): Json => {
 	if (Array.isArray(payload.system)) {

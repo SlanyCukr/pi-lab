@@ -36,4 +36,12 @@ assert.deepEqual(Object.keys(fetchTool.input_schema.properties), ["url", "urls",
 assert.deepEqual(fetchTool.input_schema.required, ["url"]);
 const searchTool = mod.trimTool({ name: "web_search", description: "x", input_schema: { type: "object", properties: prop(["query", "queries", "category", "provider", "model"]) } });
 assert.deepEqual(Object.keys(searchTool.input_schema.properties), ["query", "queries", "category"]);
-console.log("tool-trim: all payload shapes trimmed, hidden params dropped (10 checks)");
+// pi 1.5.0 renders the list as a `<tools>` section (system-prompt.js): the whole section goes, the sections around it stay
+const sys15 =
+	"You are a coding assistant running inside pi.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n\nAdditional tools may be available.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- You can inspect PI_* environment variables\n</rules>\n\n<cwd>\n/tmp\n</cwd>";
+const out15 = mod.trimSystemText(sys15);
+assert.equal(out15, "You are a coding assistant running inside pi.\n\n<rules>\n- You can inspect PI_* environment variables\n</rules>\n\n<cwd>\n/tmp\n</cwd>");
+// the trailer pi-web's older pi wrote, and a section with no tools listed (left alone)
+assert.equal(mod.trimSystemText("P\n\n<tools>\n- a: b\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<cwd>\n/x\n</cwd>"), "P\n\n<cwd>\n/x\n</cwd>");
+assert.equal(mod.trimSystemText("P\n\n<tools>\n(none)\n\nAdditional tools may be available.\n</tools>"), "P\n\n<tools>\n(none)\n\nAdditional tools may be available.\n</tools>");
+console.log("tool-trim: all payload shapes trimmed, hidden params dropped, 1.5 tools section dropped (13 checks)");

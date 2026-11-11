@@ -3,8 +3,15 @@
  *
  * Main session: `background: true` starts the command and returns at once; when it
  * exits, a follow-up message (exit code, duration, tail of the log) wakes the agent.
- * Messages that arrive while pi is busy are queued. Everything else is stock bash,
+ * A message that arrives while a run goes on joins that run at its next turn boundary
+ * (pi's `turn_end` entries); one that arrives while pi is busy otherwise (compacting,
+ * a prompt being prepared) is queued until it is idle. Everything else is stock bash,
  * delegated unchanged.
+ *
+ * Mid-run delivery (2026-11-11): until then every message waited for agent_end. A find-gaps cycle is
+ * one `pi -p` run, so its `run.sh review` results arrived only after the cycle's last answer, as
+ * stale copies, and the model polled the review logs meanwhile (2026-10-28..11-11: 93 of 163 main-session
+ * results came more than 5 min after their command ended, 4,622 min in all).
  *
  * Sub-agents run on a 5-minute prompt cache, and a command that blocks longer than
  * that costs the child its whole cached context. So in a sub-agent a command still
@@ -261,7 +268,7 @@ export default function (pi: ExtensionAPI) {
 
 	// A turn triggered while a request is in flight can race it (seen upstream as
 	// "No tool call found for function call output"), so results that arrive
-	// mid-run wait for agent_end.
+	// mid-run wait for the run's next turn boundary (turn_end below) or agent_end.
 	// pi's own view as well: it covers states no event announces. A stale ctx throws.
 	const piBusy = () => {
 		try {
@@ -283,15 +290,8 @@ export default function (pi: ExtensionAPI) {
 		}
 		// Messages first, all in one; a loop tick waits for the next idle moment, since both
 		// start a run. Entries that render to nothing (a stopped monitor) just drop out.
-		const messages = queued.filter((entry) => !entry.tick);
-		if (messages.length) {
-			for (const entry of messages) queued.splice(queued.indexOf(entry), 1);
-			const content = messages
-				.map((entry) => entry.render())
-				.filter(Boolean)
-				.join("\n\n");
-			if (content) return send(content);
-		}
+		const content = takeMessages();
+		if (content) return send(content);
 		while (queued.length) {
 			const text = queued.shift()!.render();
 			if (text) {
@@ -301,6 +301,16 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 		}
+	};
+
+	// Every queued message (not loop ticks) as one text, rendered now; "" when there is none.
+	const takeMessages = (): string => {
+		const messages = queued.filter((entry) => !entry.tick);
+		for (const entry of messages) queued.splice(queued.indexOf(entry), 1);
+		return messages
+			.map((entry) => entry.render())
+			.filter(Boolean)
+			.join("\n\n");
 	};
 
 	const enqueue = (owner: unknown, render: () => string, tick = false) => {
@@ -450,6 +460,18 @@ export default function (pi: ExtensionAPI) {
 		if (reservedUntil === consumedReservation) reservedUntil = 0;
 		// let pi finish unwinding the turn; flush re-checks for a run begun meanwhile
 		setImmediate(flush).unref?.();
+	});
+	// Results and monitor lines that came in during this turn join the run here, after its tool results and before
+	// its next request. `continue` makes pi send that request even when the model had ended its answer.
+	// Loop ticks are user prompts: they still wait for an idle moment.
+	pi.on("turn_end", (event: any) => {
+		if (shuttingDown || event?.outcome !== "completed" || Date.now() < compactingUntil) return undefined;
+		const content = takeMessages();
+		if (!content) return undefined;
+		return {
+			entries: [...(event.entries ?? []), { type: "custom_message", customType: "bg-bash", content, display: true }],
+			continue: true,
+		};
 	});
 
 	// pi may exit before a grace timer fires; nothing that ignored SIGTERM outlives it.
