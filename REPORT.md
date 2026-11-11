@@ -2,7 +2,7 @@
 
 Log of the user's pi setup: what is installed, why, and what was tried.
 
-## Current setup (as of 2026-11-10, pi 1.5.0)
+## Current setup (as of 2026-11-11, pi 1.5.0)
 
 This section is the source of truth; the sections below explain how it got here.
 
@@ -10,7 +10,7 @@ This section is the source of truth; the sections below explain how it got here.
 
 | Role | How it is wired |
 |---|---|
-| Default main session | `anthropic/claude-fable-5-2` (2026-11-09, the user; Opus 5.5 before). Unattended jobs name their own model since 2026-11-11: loop cycles `FG_CYCLE_MODEL` (default Opus 5.5), the loop's discovery cycles Fable 5.2 (`FG_DISCOVER_MODEL` in its env.sh, hybrid trial), the harness review `HARNESS_REVIEW_MODEL` (default Fable 5.2, the user; one retry on Opus 5.5 at a rate limit), thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.4 (no version pin; see AGENTS.md) |
+| Default main session | `anthropic/claude-fable-5-2` (2026-11-09, the user; Opus 5.5 before). Unattended jobs name their own model since 2026-11-11: loop cycles `FG_CYCLE_MODEL` (default Opus 5.5), the loop's discovery cycles Opus 5.5 with the J1 briefs (`FG_DISCOVER_MODEL` in its env.sh; Fable 5.2 until 11-11 14:20), the harness review `HARNESS_REVIEW_MODEL` (default Fable 5.2, the user; one retry on Opus 5.5 at a rate limit), thinking `high` (user's choice after the 2026-09-22 effort A/B), direct login through `@gotgenes/pi-anthropic-auth` 3.4.4 (no version pin; see AGENTS.md) |
 | Explorer sub-agent `Explore` | `anthropic/claude-sonnet-5-5` (2026-10-18; was `gpt-5.6-luna`), thinking low, read/grep/find/ls; the main session delegates exploration to it (GPT-6 Luna reverted 2026-09-22: 11/15 vs 15/15) |
 | Explorer alternative `explore-glm` | `zai/glm-5.3`, same rules, for parallel fan-out |
 | Reviewer sub-agent `reviewer` | `anthropic/claude-opus-5-5` (2026-10-21; Fable 5.1 from 10-18, GPT before), thinking high, read/grep/find/ls/bash; also the loop's review gate, skeptic and done-check |
@@ -52,7 +52,7 @@ Removed since the original install: `@vanillagreen/pi-claude-bridge`, `@tintinwe
 
 Reviewed 2026-09-23.
 
-1. Loop hybrid trial c498–c517 (Fable discovery cycles, Opus fix cycles, `--no-pr`): judge by review fails and follow-ups against the Fable trial (`wip/find-gaps/DESIGN.md`, last notes). The user approved pushing on 11-11: the loop restarts with `--merge --direct` after c498, which ships both trials' reviewed commits (migrations v196–v210).
+1. Loop on Opus, discovery included (11-11, the user: no Fable where it is not needed): judge the first Opus discovery passes with the J1 briefs by kept findings per pass and their scores against Fable's (11 kept in six passes, 9 at 13.5+; Opus before: 1 in about 22); back to `FG_DISCOVER_MODEL=anthropic/claude-fable-5-2` if they fall clearly short. Direct mode restarts after c500 (`/tmp/direct-restart.sh`) and ships the commits since c478 (migrations v196+). Jobs of 11-11 in `wip/find-gaps/fable-window/` (J1 deployed; J3/J5 audits sent to the loop; J2 extension review and the Opus halves of J3/J5 in `audit-queue`; J4 visitor walk after the deploy).
 2. When a pi release lists `claude-fable-5-2` itself (`pi --list-models`), delete its entry in `~/.pi/agent/models.json`: the entry replaces the built-in one, which also sets the refusal fallback to Opus 5.
 3. Note, not a to-do: the `reviewer` agent is deliberately not isolated, so the permission policy applies to its bash tool. Explorers are isolated and have no bash.
 4. pi-web's pi caches extension modules per cwd for its whole process; `ext-fresh` clears that on a code change. A pi-web upgrade that renames `clearExtensionCache` makes it inert: check for `compact-at-idle` entries.
@@ -124,6 +124,8 @@ Closed: usage check, backup (09-23); pi-packages#962 (upstream 33.1.0); exit han
 ## Decisions and why
 
 ### Models and roles
+
+- **Fable only where it is needed** (2026-11-11, the user): main session and harness review. In the loop every role is Opus 5.5 (cycle, discovery, review, skeptic) or Sonnet 5.5 (Explore, builder). Why: J1 traced the trial's 41 candidates: lenses on Sonnet found as much under either main; what differed was the brief (Fable: one end-to-end question per lens, known findings by id, a sizing query), and that brief is now in SKILL.md. GLM: only `explore-glm` inside loop sessions as the fallback when Explore hits a limit. OpenAI: no model; `openai` is still an allowed web-search provider.
 - **Fable 5.2 is the scarce allowance** (2026-11-11): a 20-cycle loop run on Fable used it up in 26 h (about $513 list in the week; Opus still answered). It found 32 kept findings where Opus had found none and no review failed, at $31 per cycle against $7. So Fable is the user's main driver, the loop's discovery model and the harness review's model (the user, 11-11: $16 a run against $3.50 on Opus, about a fifth of the allowance a week); fix cycles and reviews stay on Opus, and no unattended job follows pi's default model.
 - **Main: Opus 5.5, high** (2026-09-22, replaced Fable 5.1): all effort levels passed the A/B, high won nothing measured ($0.23 vs $0.21 medium per task); the user chose it.
 - **Builder: Opus 5.5, medium** (2026-09-22): vs Opus 5, 40 s vs 62 s, 4/20/0.2 vs 5/25/0.5 USD per M.
@@ -216,7 +218,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-11-09 — pi 1.4.0 → 1.5.0, pi-lens 4.4.11, subagents 25.0.5, web-access 0.47.0, auth 3.4.4, advisor 2.15.0 (+ our prompt), pi-web 0.15.0 (13 scratch checks first); `lsp-exit` removed; `tool-trim` hides the new params; kit pin 0.99.1 → 1.5.0. Rollback `wip/pi-update-1.5/rollback.sh`.
 - 2026-11-09 — Claude Fable 5.2 added via `models.json` (not in pi 1.5.0); real turn with a tool call works on the subscription login. Same day: the user made it the default main model (loop cycles and harness review follow; sub-agents and advisor keep their own).
 - 2026-11-09 — Loop trial on Fable 5.2 cycles: c478–c497, `--no-pr` (no push), after research rejected Fable-orchestrates-Opus (est. +55 % per commit; delegation showed no gain). Design, baselines and how to judge: `wip/find-gaps/DESIGN.md` (last note).
-- 2026-11-11 — Fable loop trial ended (111 local commits, 32 kept findings, 0 of 17 reviews failed, $603 list) and used up the week's Fable allowance; the 05:00 harness review got a 429. Runner: `FG_CYCLE_MODEL` (default Opus 5.5), `FG_DISCOVER_MODEL` (discovery-only cycles); harness review `HARNESS_REVIEW_MODEL` (Fable 5.2, Opus retry at a 429). Hybrid trial started (c498); push approved, direct mode from c499. Review: `compact-at` real size after 429s ($3.38 miss); `reviews/2026-11-11.md`.
+- 2026-11-11 — Fable loop trial ended (111 local commits, 32 kept findings, 0 of 17 reviews failed, $603 list) and used up the week's Fable allowance; the 05:00 harness review got a 429. Runner: `FG_CYCLE_MODEL` (default Opus 5.5), `FG_DISCOVER_MODEL` (discovery-only cycles); harness review `HARNESS_REVIEW_MODEL` (Fable 5.2, Opus retry at a 429). Hybrid trial started (c498); push approved, direct mode from c499. Review: `compact-at` real size after 429s ($3.38 miss); `reviews/2026-11-11.md`. Afternoon: `rpiv-todo` removed; J1's loop changes deployed (lens brief file, fresh-look attack list, background waits, a refused discovery pass stays due; suites 0 FAIL); discovery on Opus; two Fable audits (10 + 10 findings) handed to the loop; five parallel jobs froze pi-web at 11:13 (memory cap), jobs now run one at a time.
 - 2026-11-01 — G536 C2 on prod (owner yes): `stance-rerun --apply` re-judged 89 articles (119 of 1,172 stances changed). Search Console waits for the rename; name pick Mnohohlas.
 - 2026-11-03 — Loop run c439–c477 ended itself 02:32 (done-check confirmed; $513.85 list incl. GLM). Delivered: Reach, Trust, G550–G567. Next dated item: G550 re-measure 11-08. Waiting on the user: PR #408 (Dependabot, green) merge, site name.
 - 2026-11-02 — Loop GLM sub-agents exhausted the shared z.ai 5-hour quota (prod enrichment stalled 65 min): sub-agents back on Claude; runner withholds z.ai keys at >= 50 % (5 h) / 80 % (week). "Lookups in one turn" tried, removed. pi-lens #5169 posted.
