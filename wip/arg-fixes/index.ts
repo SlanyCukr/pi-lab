@@ -5,9 +5,8 @@
  *    leave unset, and for a string-typed one it sometimes writes the text "null". pi-subagents
  *    then rejects `thinking: "null"` ("Invalid thinking level", by design) and would look for a
  *    model or session literally named "null"; the model retries without it, costing a turn.
- *    Seen 2026-09-22/23. The same habit hits `todo` and `lens_diagnostics` (run to 2026-10-11: 8 of
- *    229 todo calls, 3 of them updates that renamed task 1 to "null" with description "null"; 7
- *    lens calls with `path: "null"`). Only free-text fields are listed: pi validates arguments
+ *    Seen 2026-09-22/23. The same habit hits `lens_diagnostics` (run to 2026-10-11: 7 calls with
+ *    `path: "null"`; the `todo` tool had it too until rpiv-todo was removed on 2026-11-11). Only free-text fields are listed: pi validates arguments
  *    before `tool_call`, so an enum field such as `status: "null"` fails there and never reaches us.
  *
  * 2. `\uXXXX` escapes in edit text. In non-ASCII files (Czech strings, typographic dashes) Opus
@@ -79,7 +78,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // tool -> optional string parameters where "null" / "undefined" / "" / "none" can only mean "not set"
 const FIELDS: Record<string, readonly string[]> = {
 	subagent: ["model", "thinking", "resume"],
-	todo: ["subject", "description", "activeForm"],
 	lens_diagnostics: ["path", "severity"], // pi-lens >= 4.4.9 rejects an unknown severity; 5 "null" seen by 2026-11-09
 };
 const PLACEHOLDER = /^\s*(null|undefined|none|)\s*$/i;

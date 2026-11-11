@@ -3,7 +3,7 @@
  *
  * Tool schemas ride along on every request. Most of their size was usage lectures and
  * optional parameters this setup never uses (0 calls in 169 sessions: video frames, proxies,
- * browser-cookie auth, LSP call hierarchy, analyzer tuning, todo dependencies, sub-agent
+ * browser-cookie auth, LSP call hierarchy, analyzer tuning, sub-agent
  * model/thinking overrides). This rewrites the request payload only:
  *   - replaces tool descriptions and some parameter descriptions with plain, short ones;
  *   - hides unused optional parameters (the tool itself still accepts them; the model
@@ -137,16 +137,6 @@ const TRIMS: Record<string, Trim> = {
 	},
 	get_subagent_result: { description: "Status and result of a background sub-agent." },
 	steer_subagent: { description: "Send a message to a running background sub-agent; it arrives after its current tool call." },
-	todo: {
-		description:
-			"Task list for multi-step work. Actions: create, update (status or fields), list, get, delete, clear. Status: pending, in_progress, completed (or deleted).",
-		// tasks: rpiv-todo 2.15 batch create; parallel create calls do the same without the nested schema
-		drop: ["metadata", "owner", "includeDeleted", "blockedBy", "addBlockedBy", "removeBlockedBy", "tasks"],
-		params: {
-			status: "pending, in_progress, completed or deleted; with list, a filter.",
-			activeForm: "Spinner label while in_progress, e.g. 'writing tests'.",
-		},
-	},
 };
 
 /** A provider request payload or a part of it: untyped JSON from pi-ai, shape checked at each use. */

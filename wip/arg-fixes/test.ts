@@ -86,11 +86,9 @@ ok(placeholderProblem({ edits: [{ oldText: "y", newText: "x" }] }) === undefined
 ok(placeholderProblem({ edits: [{ oldText: "const xs = []", newText: "const x = []" }] }) === undefined, "x inside real text allowed");
 ok(placeholderProblem({ edits: [{ oldText: "old block", newText: "" }] }) === undefined, "deletion (empty newText) allowed");
 ok(placeholderProblem({ edits: [{ oldText: "old", newText: "y" }] }) === undefined, "other one-letter words not listed");
-// placeholders: the todo update seen 3 times in the loop renamed task 1 to "null"
-let p: any = { action: "update", id: 1, status: "completed", activeForm: "null", description: "null", subject: "null" };
-ok(dropPlaceholders("todo", p) === 3 && JSON.stringify(p) === '{"action":"update","id":1,"status":"completed"}', "todo update: null subject/description/activeForm dropped");
-p = { action: "create", subject: "Fix login", description: "None", activeForm: "fixing login" };
-ok(dropPlaceholders("todo", p) === 1 && p.subject === "Fix login" && p.activeForm === "fixing login" && !("description" in p), "todo create: real text kept");
+// placeholders in optional free-text arguments; a tool that is not listed is left alone
+let p: any = { action: "update", id: 1, status: "completed", activeForm: "null" };
+ok(dropPlaceholders("todo", p) === 0 && p.activeForm === "null", "a tool without listed fields is not touched");
 p = { source: "lsp", scope: "paths", paths: ["a.ts"], path: "null", severity: "null", mode: "full" };
 ok(dropPlaceholders("lens_diagnostics", p) === 2 && !("path" in p) && !("severity" in p) && p.mode === "full", "lens_diagnostics: null path and severity dropped");
 p = { subagent_type: "Explore", thinking: "undefined", model: "", prompt: "null" };

@@ -11,8 +11,7 @@
     "npm:pi-lens",
     "local-packages/rpiv-advisor",
     "npm:@gotgenes/pi-subagents",
-    "npm:@gotgenes/pi-anthropic-auth",
-    "npm:@juicesharp/rpiv-todo"
+    "npm:@gotgenes/pi-anthropic-auth"
   ],
   "warnings": {
     "anthropicExtraUsage": false

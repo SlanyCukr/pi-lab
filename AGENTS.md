@@ -21,7 +21,7 @@ Host-specific details (host name, public URLs, services, the find-gaps loop and 
 | Own extensions (live) | `~/.pi/agent/extensions/<name>/index.ts` |
 | Own extensions (dev copies, tests, critic verdicts) | `~/pi-lab/wip/<name>/` |
 | Patched advisor package | `~/.pi/agent/local-packages/rpiv-advisor` |
-| Advisor / todo / pi-lens config | `~/.config/rpiv-advisor/advisor.json`, `~/.config/rpiv-todo/config.json`, `~/.pi-lens/config.json` |
+| Advisor / pi-lens config | `~/.config/rpiv-advisor/advisor.json`, `~/.pi-lens/config.json` |
 | Skills | `~/.agents/skills/` (disabled ones in `~/.agents/skills.disabled/`) |
 | Sessions | `~/.pi/agent/sessions/` |
 | pi-web service + password | `~/.config/systemd/user/pi-web.service`, `~/.config/pi-web/env` |

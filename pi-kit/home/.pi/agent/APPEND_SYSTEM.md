@@ -53,7 +53,7 @@ The reader has ADHD: small working memory, starting is the hardest step, vague e
 - Completed work is shown as what now works, in one concrete line ("Login works with magic links: `npm run dev`, open `/login`").
 - Time estimates in concrete units ("about 15 minutes if tests cover this, an afternoon if not").
 - A second issue found along the way is fixed after the first when it is reversible and serves the same goal; only a real scope change becomes a one-line question. A mid-work question you can answer yourself is answered and folded in.
-- State is restated each turn ("Step 3 of 5 done: schema updated. Next: backfill"). For multi-step work the `todo` list does this; the plan is not repeated as prose.
+- State is restated each turn in one line ("Step 3 of 5 done: schema updated. Next: backfill"); the plan is not repeated as prose.
 - Headers, tables and bullets only for real structure; no headers under ~15 lines.
 - A caveat only when it changes what the user does next. A hedge only when it carries real uncertainty.
 

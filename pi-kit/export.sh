@@ -13,7 +13,7 @@ A="$HOME/.pi/agent"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/.pi/agent/agents" "$OUT/.pi/agent/prompts" "$OUT/.pi/agent/extensions" "$OUT/.pi/agent/npm" \
-  "$OUT/.pi/agent/local-packages" "$OUT/.config/rpiv-advisor" "$OUT/.config/rpiv-todo" \
+  "$OUT/.pi/agent/local-packages" "$OUT/.config/rpiv-advisor" \
   "$OUT/.pi-lens" "$OUT/.agents/skills"
 
 sub() {
@@ -68,7 +68,6 @@ done
 
 # Tool configs
 sub < "$HOME/.config/rpiv-advisor/advisor.json" > "$OUT/.config/rpiv-advisor/advisor.json"
-cp "$HOME/.config/rpiv-todo/config.json" "$OUT/.config/rpiv-todo/"
 cp "$HOME/.pi-lens/config.json" "$OUT/.pi-lens/"
 
 # Enabled skills (the .venv is a local Python env, 600+ MB; desloppify installs its own tool).
