@@ -26,6 +26,13 @@
 // Each return after the idle limit leaves a `compact-at-idle` custom entry in the session (never sent to the model):
 // idle minutes, tokens, and compacted / skipped with the reason / failed with the error (harness review 2026-11-06:
 // on 11-05 a 22 h return at 389k tokens re-wrote the cache for $3.15 and left no trace of why it did not compact).
+//
+// Size after failed retries (harness review 2026-11-11): pi omits each failed request (a 429, an overload) with a
+// context_edit entry, and any context_edit after the last response makes getContextUsage() drop that response's real
+// count for a chars/4 estimate of every message, which misses Fable's redacted thinking. On 11-11 a 568 min return
+// after eight 429s read 112,190 tokens against a real 220,929, skipped as "under the token limit", and re-wrote
+// 211,530 tokens ($3.38). contextTokens() takes the larger of the two while every edit since the response only
+// omits a failed or aborted request; a compaction or any other edit leaves pi's number as it is.
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const PERCENT = Number(process.env.PI_COMPACT_AT_PERCENT ?? 40);
@@ -90,12 +97,34 @@ export default function (pi: ExtensionAPI) {
 		return 0;
 	};
 
+	const lastResponseTokens = (ctx: ExtensionContext): number | undefined => {
+		const branch: any[] = ctx.sessionManager.getBranch();
+		const failed = (e: any) =>
+			e?.type === "message" && e.message?.role === "assistant" && (e.message.stopReason === "error" || e.message.stopReason === "aborted");
+		for (let k = branch.length - 1; k >= 0; k--) {
+			const e = branch[k];
+			if (e?.type === "compaction") return undefined;
+			if (e?.type === "context_edit" && (e.replacement != null || !failed(branch.find((t) => t?.id === e.targetId)))) return undefined;
+			if (e?.type === "message" && e.message?.role === "assistant" && !failed(e)) {
+				const u = e.message.usage ?? {};
+				const total = (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0) + (u.output ?? 0);
+				if (total > 0) return total;
+			}
+		}
+		return undefined;
+	};
+	const contextTokens = (ctx: ExtensionContext) => {
+		const usage = ctx.getContextUsage();
+		const real = usage?.tokens == null ? undefined : lastResponseTokens(ctx);
+		return { usage, tokens: real && usage?.tokens != null ? Math.max(usage.tokens, real) : usage?.tokens };
+	};
+
 	pi.on("input", async (event: any, ctx: ExtensionContext) => {
 		if (event?.source === "extension" || !ctx.hasUI || checkChild()) return { action: "continue" };
 		const last = lastTurnAt || lastAssistantAt(ctx);
 		const idle = last ? Date.now() - last : 0;
 		if (idle <= IDLE_MS) return { action: "continue" };
-		const tokens = ctx.getContextUsage()?.tokens;
+		const { tokens } = contextTokens(ctx);
 		const record = (outcome: string, extra: Record<string, unknown> = {}) => {
 			log(`input: idle=${Math.round(idle / 1000)}s tokens=${tokens} ${outcome}`);
 			try {
@@ -157,8 +186,7 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 		if (running) return;
-		const usage = ctx.getContextUsage();
-		const tokens = usage?.tokens;
+		const { usage, tokens } = contextTokens(ctx);
 		const limit = FIXED_TOKENS ?? (usage?.contextWindow ? Math.floor((usage.contextWindow * PERCENT) / 100) : undefined);
 		log(`tokens=${tokens} limit=${limit} suppress=${suppressBelow} stop=${event?.message?.stopReason}`);
 		if (tokens == null || limit == null || tokens <= limit || tokens <= suppressBelow) return;

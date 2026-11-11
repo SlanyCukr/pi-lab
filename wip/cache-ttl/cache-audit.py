@@ -10,7 +10,9 @@ cache read with the previous turn's whole context (read + write + input):
   full break    the read fell below half: the context was written again from the system prompt
                 (a run of injections longer than Anthropic's 20-block look-back, an expired cache, a head change)
 Dollars use the 1 h cache-write price of the turn's model (2 x input). "thinking dropped" counts turns whose
-request lost earlier thinking blocks (`thinking_dropped`, reason prefix_binding_mismatch).
+request lost a thinking block that the session's previous request still carried (`thinking_dropped`, reason
+prefix_binding_mismatch); a block once dropped stays dropped in every later request, so counting every turn that
+lists one counted old losses again (2026-11-11: the same 24 blocks from 11-09 made 36 of 36 pi-lab turns "dropped").
 """
 import collections
 import glob
@@ -36,6 +38,7 @@ def main() -> None:
     for role, pattern in ROOTS:
         for path in glob.glob(pattern):
             prev = 0
+            dropped_before: set = set()
             for line in open(path, errors="replace"):
                 if '"usage"' not in line:
                     continue
@@ -50,15 +53,20 @@ def main() -> None:
                 read, write = usage.get("cacheRead", 0), usage.get("cacheWrite", 0)
                 context = read + write + usage.get("input", 0)
                 stamp = entry.get("timestamp", "")
+                dropped = {
+                    t.get("path")
+                    for d in message.get("diagnostics") or []
+                    for t in (d.get("details") or {}).get("transformations") or []
+                    if t.get("type") == "thinking_dropped"
+                }
+                new_drop = bool(dropped - dropped_before)
+                if message.get("stopReason") != "error":  # a failed request reports no transformations
+                    dropped_before = dropped
                 if stamp >= since:
                     row = rows[(stamp[:10] if by_day else "all", role)]
                     row["turns"] += 1
                     row["cost"] += (usage.get("cost") or {}).get("total", 0)
-                    if any(
-                        t.get("type") == "thinking_dropped"
-                        for d in message.get("diagnostics") or []
-                        for t in (d.get("details") or {}).get("transformations") or []
-                    ):
+                    if new_drop:
                         row["dropped"] += 1
                     miss = prev - read
                     if prev and miss > 1500:
@@ -69,7 +77,7 @@ def main() -> None:
                         row[kind + "_usd"] += rewritten * WRITE_1H.get(str(message.get("model")), 8) / 1e6
                 prev = context
     print(f"cache audit since {since} (UTC)")
-    print(f"{'':22} {'turns':>6} {'cost $':>8} | {'partial':>7} {'tokens':>9} {'$':>7} | {'full':>4} {'tokens':>9} {'$':>7} | thinking dropped")
+    print(f"{'':22} {'turns':>6} {'cost $':>8} | {'partial':>7} {'tokens':>9} {'$':>7} | {'full':>4} {'tokens':>9} {'$':>7} | new thinking drops")
     for key in sorted(rows):
         r = rows[key]
         share = 100 * r["dropped"] / r["turns"] if r["turns"] else 0
