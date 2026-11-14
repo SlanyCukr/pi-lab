@@ -5,8 +5,10 @@
  * exits, a follow-up message (exit code, duration, tail of the log) wakes the agent.
  * A message that arrives while a run goes on joins that run at its next turn boundary
  * (pi's `turn_end` entries); one that arrives while pi is busy otherwise (compacting,
- * a prompt being prepared) is queued until it is idle. Everything else is stock bash,
- * delegated unchanged.
+ * a prompt being prepared) is queued until it is idle. Before it starts a turn from idle it
+ * emits `bg-bash:before-wake` on the session's event bus, and a listener that sets `hold` on
+ * the gate object makes it wait (compact-at: compaction of an idle session, 2026-11-14).
+ * Everything else is stock bash, delegated unchanged.
  *
  * Mid-run delivery (2026-11-11): until then every message waited for agent_end. A find-gaps cycle is
  * one `pi -p` run, so its `run.sh review` results arrived only after the cycle's last answer, as
@@ -285,6 +287,19 @@ export default function (pi: ExtensionAPI) {
 		if (shuttingDown || queued.length === 0) return;
 		if (busy()) {
 			// not every busy state ends in an event we see, so look again shortly
+			(retry = setTimeout(flush, 1000)).unref?.();
+			return;
+		}
+		// About to start a turn from idle. Another extension may need to act first: compact-at compacts a session whose
+		// 1 h prompt cache has expired (2026-11-14: a result that woke a session idle for 136 min re-wrote 223,821 tokens,
+		// $3.60). It sets `hold` on the gate; the queue stays as it is and this looks again, as for any busy state.
+		const gate = { ctx: lastCtx, hold: false };
+		try {
+			pi.events.emit("bg-bash:before-wake", gate);
+		} catch {
+			// no event bus: send as before
+		}
+		if (gate.hold) {
 			(retry = setTimeout(flush, 1000)).unref?.();
 			return;
 		}

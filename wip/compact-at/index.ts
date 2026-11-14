@@ -33,6 +33,14 @@
 // after eight 429s read 112,190 tokens against a real 220,929, skipped as "under the token limit", and re-wrote
 // 211,530 tokens ($3.38). contextTokens() takes the larger of the two while every edit since the response only
 // omits a failed or aborted request; a compaction or any other edit leaves pi's number as it is.
+//
+// Compact before a background result (harness review 2026-11-14, the user's pick on 11-13): a bg-bash result, monitor
+// line or loop tick that wakes an idle session meets the same expired cache, and the user-message check never saw it
+// (it is no `input`). 11 such wake-ups in 30 days re-wrote $22.36; 11-14 02:40 UTC: 223,821 tokens, $3.60, 136 min after
+// the last turn. bg-bash now asks on the session's event bus before it starts a turn from idle
+// (`bg-bash:before-wake`, a gate object with the ctx); under the same limits this extension sets `gate.hold` and
+// compacts, and bg-bash looks again once the compaction is over. One try per idle period, so a failed compaction
+// lets the result through on the full context. The result is not lost meanwhile: it stays in bg-bash's queue.
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const PERCENT = Number(process.env.PI_COMPACT_AT_PERCENT ?? 40);
@@ -44,7 +52,8 @@ const IDLE_TOKENS = Number(process.env.PI_COMPACT_IDLE_TOKENS ?? 150_000);
 const INSTRUCTIONS = [
 	"Preserve exactly: the user's goal and standing instructions; decisions made and the reason for each;",
 	"work finished, work in progress and work still open; identifiers (branch names, worktree paths, PR and run numbers,",
-	"sub-agent ids with what each was asked and whether its result was already collected); the commands that verified",
+	"sub-agent ids with what each was asked and whether its result was already collected; background commands, monitors",
+	"and loops still running, with their id and what each is for); the commands that verified",
 	"results and what they printed; file:line evidence already gathered. Drop raw command output, file dumps and",
 	"sub-agent report bodies once their conclusion is recorded.",
 ].join(" ");
@@ -119,27 +128,23 @@ export default function (pi: ExtensionAPI) {
 		return { usage, tokens: real && usage?.tokens != null ? Math.max(usage.tokens, real) : usage?.tokens };
 	};
 
-	pi.on("input", async (event: any, ctx: ExtensionContext) => {
-		if (event?.source === "extension" || !ctx.hasUI || checkChild()) return { action: "continue" };
-		const last = lastTurnAt || lastAssistantAt(ctx);
-		const idle = last ? Date.now() - last : 0;
-		if (idle <= IDLE_MS) return { action: "continue" };
+	// What wakes a session after the idle limit (a user message, or a bg-bash result) waits for a compaction when the
+	// context is over the token limit. Resolves when the compaction is over, or at once when there is none to do.
+	// `what` names the waker in the notice ("your message"); `by` marks a wake by bg-bash in the session entry.
+	const compactIdle = async (ctx: ExtensionContext, idle: number, what: string, by: Record<string, unknown>, busy?: string): Promise<void> => {
 		const { tokens } = contextTokens(ctx);
 		const record = (outcome: string, extra: Record<string, unknown> = {}) => {
-			log(`input: idle=${Math.round(idle / 1000)}s tokens=${tokens} ${outcome}`);
+			log(`${what}: idle=${Math.round(idle / 1000)}s tokens=${tokens} ${outcome}`);
 			try {
-				pi.appendEntry("compact-at-idle", { idleMin: Math.round(idle / 60_000), tokens, outcome, ...extra });
+				pi.appendEntry("compact-at-idle", { idleMin: Math.round(idle / 60_000), tokens, outcome, ...by, ...extra });
 			} catch (e: any) {
 				log(`appendEntry failed: ${e?.message}`);
 			}
 		};
-		const skip = event?.streamingBehavior ? "agent running" : running ? "compaction running" : tokens == null ? "context size unknown"
+		const skip = busy ? busy : running ? "compaction running" : tokens == null ? "context size unknown"
 			: tokens <= IDLE_TOKENS ? "under the token limit" : runningAgents.size > 0 ? "sub-agents running" : "";
-		if (skip) {
-			record(`skipped: ${skip}`);
-			return { action: "continue" };
-		}
-		running = true;
+		if (skip) return record(`skipped: ${skip}`);
+		running = true; // set before the first await: the bg-bash gate reads it right after this call
 		try {
 			try {
 				ctx.ui.notify(`Compacting first: ${Math.round(tokens! / 1000)}k tokens after ${Math.round(idle / 60_000)} min idle (the prompt cache expired)`, "info");
@@ -156,10 +161,10 @@ export default function (pi: ExtensionAPI) {
 						resolve();
 					},
 					onError: (error: any) => {
-						// the message still goes out, on the full context; say so, since that turn re-writes the whole cache
+						// the waker still goes out, on the full context; say so, since that turn re-writes the whole cache
 						record("failed", { error: String(error?.message ?? error) });
 						try {
-							ctx.ui.notify(`Compacting first failed (${error?.message}); your message goes out on the full context`, "warning");
+							ctx.ui.notify(`Compacting first failed (${error?.message}); ${what} goes out on the full context`, "warning");
 						} catch (e: any) {
 							log(`notify failed: ${e?.message}`);
 						}
@@ -172,7 +177,36 @@ export default function (pi: ExtensionAPI) {
 		} finally {
 			running = false; // a throw must not leave the 40 % trigger disabled for the rest of the session
 		}
+	};
+
+	pi.on("input", async (event: any, ctx: ExtensionContext) => {
+		if (event?.source === "extension" || !ctx.hasUI || checkChild()) return { action: "continue" };
+		const last = lastTurnAt || lastAssistantAt(ctx);
+		const idle = last ? Date.now() - last : 0;
+		if (idle <= IDLE_MS) return { action: "continue" };
+		await compactIdle(ctx, idle, "your message", {}, event?.streamingBehavior ? "agent running" : undefined);
 		return { action: "continue" };
+	});
+
+	// bg-bash is about to start a turn from idle (a background result, monitor lines, a loop tick): see the header.
+	let wakeTriedFor = 0; // the idle period (the time of its last turn) a wake compaction was tried for
+	pi.events.on("bg-bash:before-wake", (gate: any) => {
+		const ctx: ExtensionContext | undefined = gate?.ctx;
+		try {
+			if (!ctx?.hasUI || checkChild()) return;
+			if (running) {
+				gate.hold = true; // a compaction is going on: the turn waits for its end
+				return;
+			}
+			const last = lastTurnAt || lastAssistantAt(ctx);
+			const idle = last ? Date.now() - last : 0;
+			if (idle <= IDLE_MS || wakeTriedFor === last) return;
+			wakeTriedFor = last;
+			void compactIdle(ctx, idle, "the background result", { by: "bg-bash" });
+			if (running) gate.hold = true;
+		} catch (e: any) {
+			log(`before-wake failed: ${e?.message}`); // a stale ctx: the result goes out as it would have
+		}
 	});
 
 	pi.on("turn_end", (event: any, ctx: ExtensionContext) => {

@@ -10,14 +10,20 @@
 // and read 14,647 cached tokens; 288,999 were written again ($4.64 on Fable 5.2) and 94 thinking blocks dropped.
 //
 // What it does, on Anthropic-shaped requests of the main session:
-// - records each retained pi-lens message as a `lens-replay` session entry: the id of the tool result it follows, its
+// - records each retained pi-lens message as a `lens-replay` session entry: the message it follows (its anchor), its
 //   position there, its text. pi-lens messages are user messages that start with "[pi-lens automated "; the ones
 //   sent in one request form a group, and a retained group ends with the snapshot label;
-// - in a process that did not see them made, puts the recorded messages back after their tool result when pi-lens
-//   has not sent them itself.
-// Not covered: a finding pi-lens appends to a user prompt's own text (it has no message of its own), and messages
-// that follow something other than a tool result.
+// - in a process that did not see them made, puts the recorded messages back after their anchor when pi-lens has
+//   not sent them itself.
+// The anchor is the user message before the group: a tool result (its id) or a text message (a hash of its text and
+// which message with that text it is). pi-lens puts a finding after whatever the last message is, and bg-bash adds a
+// background command's result to a run after the turn's tool results, so a finding often follows that text.
+// Harness review 2026-11-14: only tool results were anchors; cycle 528 lost 5 of its 59 findings that way, all five
+// after a bg-bash result, and the fix round of cycle 525 read 14,647 of 394,268 cached tokens ($3.04 written again).
+// Not covered: a finding pi-lens appends to a user prompt's own text (it has no message of its own), and one that
+// follows an assistant message.
 // PI_LENS_REPLAY=0 turns it off. Test: node wip/lens-replay/test.mjs
+import { createHash } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const MARK = "[pi-lens automated ";
@@ -41,13 +47,29 @@ const toolResultId = (message: any): string | undefined => {
 };
 export const keyOf = (k: Kept): string => `${k.after}#${k.n}`;
 
-/** The retained pi-lens messages of a request, each with the tool result it follows. */
+/** For each message, the anchor it gives the pi-lens messages after it; undefined when it can hold none. */
+export function anchors(messages: any[]): (string | undefined)[] {
+	const times = new Map<string, number>();
+	return messages.map((message) => {
+		const id = toolResultId(message);
+		if (id) return id;
+		const text = textOf(message);
+		if (text === undefined || text.startsWith(MARK)) return undefined;
+		const hash = createHash("sha256").update(text).digest("hex").slice(0, 16);
+		const k = times.get(hash) ?? 0;
+		times.set(hash, k + 1);
+		return `text:${hash}:${k}`;
+	});
+}
+
+/** The retained pi-lens messages of a request, each with the message it follows. */
 export function collect(messages: any[]): Kept[] {
 	const out: Kept[] = [];
-	messages.forEach((message, i) => {
-		const after = toolResultId(message);
+	const anchor = anchors(messages);
+	messages.forEach((_message, i) => {
+		const after = anchor[i];
 		if (!after) return;
-		// the pi-lens messages right after the tool result, up to the last one that carries the snapshot label
+		// the pi-lens messages right after the anchor, up to the last one that carries the snapshot label
 		let end = i;
 		for (let j = i + 1; j < messages.length && isLens(messages[j]); j++) if (textOf(messages[j])!.includes(SNAPSHOT)) end = j;
 		for (let j = i + 1; j <= end; j++) out.push({ after, n: j - i - 1, content: textOf(messages[j])! });
@@ -62,9 +84,10 @@ export function replay(messages: any[], kept: Kept[]): any[] | undefined {
 	for (const k of kept) byAnchor.set(k.after, [...(byAnchor.get(k.after) ?? []), k]);
 	let changed = false;
 	const out: any[] = [];
+	const anchor = anchors(messages);
 	messages.forEach((message, i) => {
 		out.push(message);
-		const id = toolResultId(message);
+		const id = anchor[i];
 		const list = id ? byAnchor.get(id) : undefined;
 		if (!list) return;
 		const present = new Set<string>();

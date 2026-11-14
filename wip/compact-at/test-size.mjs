@@ -69,4 +69,63 @@ r = await run([user("u1"), ok("a1", 220_000), { type: "compaction", id: "c1", ti
 assert.equal(r.tokens, null);
 assert.equal(r.outcome, "skipped: context size unknown");
 console.log("ok  compaction: size unknown, skipped");
-console.log("all 5 passed");
+
+// 6-9. the bg-bash gate (harness review 2026-11-14): a background result that wakes an idle session
+function wake(branch, piTokens, { fail = false, hasUI = true } = {}) {
+	const hooks = {};
+	const bus = {};
+	const entries = [];
+	const pi = { events: { on: (name, fn) => (bus[name] = fn) }, on: (name, fn) => (hooks[name] = fn), appendEntry: (type, data) => entries.push(data), getActiveTools: () => [], sendMessage() {} };
+	ext(pi);
+	let finish;
+	let compactions = 0;
+	const ctx = {
+		hasUI,
+		sessionManager: { getBranch: () => branch },
+		getContextUsage: () => ({ tokens: piTokens, contextWindow: 1_000_000 }),
+		ui: { notify() {} },
+		compact: ({ onComplete, onError }) => {
+			compactions++;
+			finish = () => (fail ? onError(new Error("boom")) : onComplete({ tokensAfter: 40_000 }));
+		},
+	};
+	const ask = () => {
+		const gate = { ctx, hold: false };
+		bus["bg-bash:before-wake"](gate);
+		return gate.hold;
+	};
+	return { ask, entries, finish: () => finish(), compactions: () => compactions };
+}
+const big = [user("u1"), ok("a1", 223_821)];
+let w = wake(big, 223_821);
+assert.equal(w.ask(), true); // idle 10 h, 224k: the result waits and a compaction starts
+assert.equal(w.ask(), true); // asked again while it runs: still waiting, no second compaction
+assert.equal(w.compactions(), 1);
+w.finish();
+await new Promise((r) => setImmediate(r));
+assert.equal(w.ask(), false); // over: the result goes out
+assert.deepEqual(w.entries.map((e) => [e.outcome, e.by]), [["compacted", "bg-bash"]]);
+console.log("ok  wake: holds the result, compacts once, then lets it through");
+
+w = wake(big, 223_821, { fail: true });
+assert.equal(w.ask(), true);
+w.finish();
+await new Promise((r) => setImmediate(r));
+assert.equal(w.ask(), false); // one try per idle period: no loop on a failing compaction
+assert.equal(w.compactions(), 1);
+assert.equal(w.entries[0].outcome, "failed");
+console.log("ok  wake: a failed compaction lets the result through, no second try");
+
+w = wake([user("u1"), ok("a1", 100_000)], 100_400);
+assert.equal(w.ask(), false);
+assert.equal(w.ask(), false);
+assert.deepEqual(w.entries.map((e) => e.outcome), ["skipped: under the token limit"]); // recorded once
+console.log("ok  wake: under the token limit, no hold, one entry");
+
+const fresh = new Date().toISOString();
+w = wake([user("u1"), { ...ok("a1", 223_821), timestamp: fresh }], 223_821);
+assert.equal(w.ask(), false); // not idle: the cache is warm
+assert.equal(wake(big, 223_821, { hasUI: false }).ask(), false); // print mode
+assert.equal(w.entries.length, 0);
+console.log("ok  wake: a warm session and print mode are left alone");
+console.log("all 9 passed");

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 
 const file = process.argv[2] ?? new URL("./index.ts", import.meta.url).pathname;
-const { collect, replay, keyOf } = await import(pathToFileURL(file).href);
+const { collect, replay, keyOf, anchors } = await import(pathToFileURL(file).href);
 
 const SNAP = "\n\n[pi-lens snapshot: these findings are as of this turn and repeat unchanged in later requests; lens_diagnostics shows the current state.]";
 const lens = (text) => ({ role: "user", content: `[pi-lens automated check — not a user request] ${text}${SNAP}` });
@@ -60,7 +60,7 @@ ok("replay: a tool result that left the request (compaction) gets nothing", () =
 ok("collect: a one-request finding (no group member has the label), a prompt that quotes the label, and a finding after an assistant message are left out", () => {
 	const once = { role: "user", content: "[pi-lens automated check — not a user request] seen once" };
 	const quoted = prompt("the text [pi-lens snapshot: appears in my prompt");
-	assert.deepEqual(collect([prompt("go"), call("t1"), result("t1"), once, quoted, lens("after a prompt")]), []);
+	assert.deepEqual(collect([prompt("go"), call("t1"), result("t1"), once, quoted, sys()]), []);
 	assert.deepEqual(collect([call("t1"), result("t1"), lens("kept"), once, sys()]).map(keyOf), ["t1#0"]);
 	assert.deepEqual(collect([prompt("go"), { role: "assistant", content: [{ type: "text", text: "hi" }] }, lens("no tool result before")]), []);
 });
@@ -74,5 +74,28 @@ ok("replay: several tool results in one message anchor on the last one", () => {
 	const k = collect([call("t9"), two, lens("D")]);
 	assert.deepEqual(k.map(keyOf), ["t9#0"]);
 	assert.equal(replay([call("t9"), two, sys()], k)[2].content, lens("D").content);
+});
+// 2026-11-14: bg-bash adds a background command's result after the turn's tool results; the finding follows that text
+const bg = (text) => ({ role: "user", content: [{ type: "text", text }] });
+const live = [prompt("go"), sys(), call("t11"), result("t11"), bg("Background command bg1 finished: exit code 0"), lens("E"), sys(), call("t12"), result("t12"), bg("same text"), bg("same text"), lens("F"), sys()];
+const fromFileLive = live.filter((m) => !(typeof m.content === "string" && m.content.startsWith("[pi-lens ")));
+ok("collect + replay: a finding after a text message (a bg-bash result) is recorded and put back there", () => {
+	const k = collect(live);
+	assert.equal(k.length, 2);
+	assert.match(k[0].after, /^text:[0-9a-f]{16}:0$/);
+	assert.match(k[1].after, /^text:[0-9a-f]{16}:1$/); // the second of two messages with the same text
+	const out = replay([...fromFileLive, { role: "assistant", content: [{ type: "text", text: "done" }] }, prompt("again"), sys()], k);
+	assert.deepEqual(out.slice(0, live.length), live);
+	assert.equal(replay(live, k), undefined);
+});
+ok("replay: entries of both kinds (tool result ids as recorded before 2026-11-14, text anchors) in one request", () => {
+	const both = [...kept, ...collect(live)];
+	const request = [...first.slice(0, -1), ...live.slice(1)];
+	const bareRequest = request.filter((m) => !(typeof m.content === "string" && m.content.startsWith("[pi-lens ")));
+	assert.deepEqual(replay(bareRequest, both), request);
+});
+ok("collect: a text anchor is the message itself, not a pi-lens message; a prompt with an image is no anchor", () => {
+	assert.deepEqual(anchors([lens("A"), prompt("x"), prompt("x"), { role: "user", content: [{ type: "image", source: {} }, { type: "text", text: "x" }] }]).map((a) => a?.split(":").slice(0, 3).length ?? 0), [0, 3, 3, 0]);
+	assert.deepEqual(collect([{ role: "user", content: [{ type: "image", source: {} }] }, lens("after an image")]), []);
 });
 console.log(`${n} passed`);
