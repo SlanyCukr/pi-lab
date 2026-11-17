@@ -15,6 +15,14 @@
  * stale copies, and the model polled the review logs meanwhile (2026-10-28..11-11: 93 of 163 main-session
  * results came more than 5 min after their command ended, 4,622 min in all).
  *
+ * Headless main sessions (`pi -p`, JSON mode; 2026-11-17): the run ends with the model's turn, so a cycle with
+ * nothing left to do has to block on its background command. There `pi-bg-wait <id>` waits until the command
+ * exits (or for the call's `timeout`), not for a 240 s window, and the hand-off notice names it. 2026-11-15..17,
+ * find-gaps cycles: 18 of 27 waits came back "still running" after 240 s although each asked for 900 s or more,
+ * so cycles polled the log with `until grep … sleep` instead (65 loops), and 3 such loops in 17 days waited
+ * 36-58 min for a line the output never printed. Interactive sessions keep the window: there the model ends its
+ * turn and the result message wakes it.
+ *
  * Sub-agents run on a 5-minute prompt cache, and a command that blocks longer than
  * that costs the child its whole cached context. So in a sub-agent a command still
  * running after PI_BG_BASH_AUTO_SECONDS (default 240) is handed off: the tool call
@@ -592,13 +600,15 @@ export default function (pi: ExtensionAPI) {
 		return `Stopped ${id}${lines}. Nothing more will arrive from it.`;
 	};
 
-	const handOffNotice = (job: Job, immediate: boolean): string => {
+	const handOffNotice = (job: Job, immediate: boolean, headless = false): string => {
 		const lead = immediate
 			? `Started in the background as ${job.id} (process group ${job.pgid}).`
 			: `Still running after ${Math.round(AUTO_MS / 1000)}s, so it now runs in the background as ${job.id} (process group ${job.pgid}); its output so far is above.`;
 		const next = isChild()
 			? `To keep waiting for it, run the bash command \`pi-bg-wait ${job.id}\`: it returns when the command exits, or after another ${Math.round(AUTO_MS / 1000)}s with the new output. The command is killed if you end your turn while it runs.`
-			: `Its result will arrive as a message when it exits, so do not wait for it with sleep or poll it: carry on with other work, or end your turn if there is none.`;
+			: headless
+				? `Its result will arrive as a message when it exits, so do not wait for it with sleep or a poll loop on its log: carry on with other work. This run ends when your turn ends, so once no other work is left, run the bash command \`pi-bg-wait ${job.id}\` (give a timeout): it returns the result as soon as the command exits.`
+				: `Its result will arrive as a message when it exits, so do not wait for it with sleep or poll it: carry on with other work, or end your turn if there is none.`;
 		return `${lead} ${next}\nProgress if needed: tail -n 20 ${job.log}\nStop it: kill -- -${job.pgid}`;
 	};
 
@@ -825,12 +835,14 @@ export default function (pi: ExtensionAPI) {
 		});
 	};
 
-	// `pi-bg-wait <id>`: block on a handed-off command for one more window.
-	const waitFor = async (id: string, signal?: AbortSignal, timeout?: number): Promise<string> => {
+	// `pi-bg-wait <id>`: block on a handed-off command for one more window, or with `untilExit` (a headless main
+	// session, see the header) until it exits or the call's timeout passes.
+	const waitFor = async (id: string, signal?: AbortSignal, timeout?: number, untilExit = false): Promise<string> => {
 		if (timeout !== undefined && !(Number.isFinite(timeout) && timeout > 0 && timeout <= MAX_TIMEOUT_SECONDS)) {
 			throw new Error(`Invalid timeout ${timeout}: give a number of seconds between 1 and ${MAX_TIMEOUT_SECONDS}, or none.`);
 		}
-		const windowMs = Math.min(AUTO_MS > 0 ? AUTO_MS : 240_000, timeout !== undefined ? timeout * 1000 : Number.POSITIVE_INFINITY);
+		const asked = timeout !== undefined ? timeout * 1000 : Number.POSITIVE_INFINITY;
+		const windowMs = untilExit ? asked : Math.min(AUTO_MS > 0 ? AUTO_MS : 240_000, asked);
 		const job = jobs.get(id);
 		if (!job) throw new Error(`No background command ${id} in this session (finished long ago, or never started).`);
 		if (job.result) return collected(job);
@@ -840,7 +852,7 @@ export default function (pi: ExtensionAPI) {
 		try {
 			await new Promise<void>((resolve, reject) => {
 				job.onDone.push(resolve);
-				timer = setTimeout(resolve, windowMs);
+				if (Number.isFinite(windowMs)) timer = setTimeout(resolve, windowMs);
 				onAbort = () => reject(new Error("aborted"));
 				if (signal?.aborted) onAbort();
 				else signal?.addEventListener("abort", onAbort, { once: true });
@@ -916,9 +928,10 @@ export default function (pi: ExtensionAPI) {
 			const { background, monitor, persistent, ...rest } = params;
 			const options = shellOptions();
 			const child = isChild();
+			const headless = !child && ctx?.hasUI === false;
 
 			const wait = WAIT_COMMAND.exec(rest.command ?? "");
-			if (wait) return { content: [{ type: "text", text: await waitFor(jobId(wait[1]), signal, rest.timeout) }], details: undefined as any };
+			if (wait) return { content: [{ type: "text", text: await waitFor(jobId(wait[1]), signal, rest.timeout, headless) }], details: undefined as any };
 			const stopId = STOP_COMMAND.exec(rest.command ?? "");
 			if (stopId) return { content: [{ type: "text", text: stop(jobId(stopId[1])) }], details: undefined as any };
 			const chain = WAIT_CHAIN.exec(rest.command ?? "");
@@ -928,7 +941,7 @@ export default function (pi: ExtensionAPI) {
 					const id = jobId(m[1].replace(/^bg/, ""));
 					let text: string;
 					try {
-						text = await waitFor(id, signal, rest.timeout);
+						text = await waitFor(id, signal, rest.timeout, headless);
 					} catch (e) {
 						text = e instanceof Error ? e.message : String(e);
 					}
@@ -973,7 +986,7 @@ export default function (pi: ExtensionAPI) {
 						}
 					}
 					try {
-						const text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout) : stop(op.id);
+						const text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout, headless) : stop(op.id);
 						// a wait succeeds only when its job has finished, as a real `wait` would
 						ok = op.kind === "stop" || Boolean(jobs.get(op.id)?.result);
 						broke = false;
@@ -1097,7 +1110,7 @@ export default function (pi: ExtensionAPI) {
 				const result = await tool.execute(toolCallId, rest, signal, onUpdate, ctx);
 				if (!call.job) return result;
 
-				const notice = handOffNotice(call.job, call.background);
+				const notice = handOffNotice(call.job, call.background, headless);
 				if (call.background) return { ...result, content: [{ type: "text", text: notice }] };
 				return { ...result, content: [...result.content, { type: "text", text: `\n${notice}` }] };
 			});
