@@ -95,13 +95,19 @@ const MAX_TIMEOUT_SECONDS = 2_147_483; // setTimeout overflows past 2^31-1 ms an
 const CD_PREFIX = String.raw`^\s*(?:cd\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)\s*(?:&&|;)\s*)?`;
 // A bare number means bgN: find-gaps reviewers sent `pi-bg-wait 13` 33 times in a day (2026-10-01), each a
 // "command not found" from bash.
-const WAIT_COMMAND = new RegExp(CD_PREFIX + String.raw`pi-bg-wait\s+(?:bg)?(\d+)\s*$`);
+// Seconds after the id are the wait's own timeout (`pi-bg-wait bg1 600`, `--timeout 600`): the headless notice says
+// "give a timeout", and 25 of the 89 wait commands the find-gaps cycles sent on 2026-11-17 came in that form and
+// were refused, in 9 sessions twice in a row. With the call's `timeout` given too, the shorter one counts.
+const WAIT_SECS = String.raw`(?:\s+(?:(?:--timeout|-t)(?:=|\s+))?(\d+)s?)?`;
+const waitSecs = (callTimeout: number | undefined, own: string | number | undefined): number | undefined =>
+	own === undefined ? callTimeout : Math.min(Number(own), callTimeout ?? Number.POSITIVE_INFINITY);
+const WAIT_COMMAND = new RegExp(CD_PREFIX + String.raw`pi-bg-wait\s+(?:bg)?(\d+)` + WAIT_SECS + String.raw`\s*$`);
 const STOP_COMMAND = new RegExp(CD_PREFIX + String.raw`pi-bg-stop\s+(bg\d+|\d+|loop\d+)\s*$`);
 const jobId = (id: string) => (/^\d+$/.test(id) ? `bg${id}` : id);
 // Several waits chained with && (`pi-bg-wait bg1 && pi-bg-wait bg2`, 8 times in the reviews of 2026-10-01): wait for
 // each in turn. Waits and stops mixed with other commands run first, then the rest goes to bash (mixed.ts); a mix
 // that cannot be split safely is refused here with a message saying how to split it.
-const WAIT_CHAIN = new RegExp(CD_PREFIX + String.raw`(pi-bg-wait\s+(?:bg)?\d+(?:\s*&&\s*pi-bg-wait\s+(?:bg)?\d+)+)\s*$`);
+const WAIT_CHAIN = new RegExp(CD_PREFIX + String.raw`(pi-bg-wait\s+(?:bg)?\d+` + WAIT_SECS + String.raw`(?:\s*&&\s*pi-bg-wait\s+(?:bg)?\d+` + WAIT_SECS + String.raw`)+)\s*$`);
 // only in command position with an id, so `grep pi-bg-wait index.ts` or `echo 'pi-bg-wait bg1'` still run
 const MIXED_WAIT = /(^|&&|\|\||;|\|)\s*pi-bg-(wait|stop)\s+(bg|loop)?\d+\b/;
 // a leading `sleep N` that is a poll: group 1 the optional `cd` prefix, group 2 the seconds
@@ -931,17 +937,17 @@ export default function (pi: ExtensionAPI) {
 			const headless = !child && ctx?.hasUI === false;
 
 			const wait = WAIT_COMMAND.exec(rest.command ?? "");
-			if (wait) return { content: [{ type: "text", text: await waitFor(jobId(wait[1]), signal, rest.timeout, headless) }], details: undefined as any };
+			if (wait) return { content: [{ type: "text", text: await waitFor(jobId(wait[1]), signal, waitSecs(rest.timeout, wait[2]), headless) }], details: undefined as any };
 			const stopId = STOP_COMMAND.exec(rest.command ?? "");
 			if (stopId) return { content: [{ type: "text", text: stop(jobId(stopId[1])) }], details: undefined as any };
 			const chain = WAIT_CHAIN.exec(rest.command ?? "");
 			if (chain) {
 				const parts: string[] = [];
-				for (const m of chain[1].matchAll(/pi-bg-wait\s+((?:bg)?\d+)/g)) {
+				for (const m of chain[1].matchAll(new RegExp(String.raw`pi-bg-wait\s+((?:bg)?\d+)` + WAIT_SECS, "g"))) {
 					const id = jobId(m[1].replace(/^bg/, ""));
 					let text: string;
 					try {
-						text = await waitFor(id, signal, rest.timeout, headless);
+						text = await waitFor(id, signal, waitSecs(rest.timeout, m[2]), headless);
 					} catch (e) {
 						text = e instanceof Error ? e.message : String(e);
 					}
@@ -986,7 +992,7 @@ export default function (pi: ExtensionAPI) {
 						}
 					}
 					try {
-						const text = op.kind === "wait" ? await waitFor(op.id, signal, rest.timeout, headless) : stop(op.id);
+						const text = op.kind === "wait" ? await waitFor(op.id, signal, waitSecs(rest.timeout, op.seconds), headless) : stop(op.id);
 						// a wait succeeds only when its job has finished, as a real `wait` would
 						ok = op.kind === "stop" || Boolean(jobs.get(op.id)?.result);
 						broke = false;

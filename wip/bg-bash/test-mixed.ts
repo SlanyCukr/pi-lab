@@ -44,6 +44,15 @@ same("cat <<'EOF' > f\npi-bg-wait bg1\nEOF\npi-bg-wait bg1", undefined);
 same("pi-bg-wait loop1; date", undefined);
 same("(cd /r && pi-bg-wait bg1); date", undefined);
 same("pi-bg-wait bg1 > /tmp/out.txt; cat /tmp/out.txt", undefined);
+// a wait with its own seconds (2026-11-17: 25 of 89 wait commands refused), in each mixed shape the cycles sent
+const ws = (id: string, seconds: number) => ({ kind: "wait", id, seconds });
+same("pi-bg-wait bg1 600; cd /r/walk && grep -c 200 walk.log", m({ ops: [ws("bg1", 600)], joins: [";"], after: "cd /r/walk && grep -c 200 walk.log" }));
+same("grep -c 'u00' /r/ledger.md; pi-bg-wait bg1 600", m({ before: "grep -c 'u00' /r/ledger.md", ops: [ws("bg1", 600)], joins: [";"] }));
+same("pi-bg-wait bg1 600 2>&1 | tail -5; cd /r && cat walk.log", m({ ops: [ws("bg1", 600)], joins: [";"], after: "cd /r && cat walk.log" }));
+same("pi-bg-wait 2 --timeout 900 && pi-bg-wait bg3 -t 30s; date", m({ ops: [ws("bg2", 900), ws("bg3", 30)], joins: ["&&", ";"], after: "date" }));
+same("pi-bg-wait bg1 --timeout=2400 2>/dev/null || pi-bg-wait bg1", undefined);
+same("pi-bg-stop bg1 600; date", undefined);
+same("pi-bg-wait bg1 600 700; date", undefined);
 // only quoted text: bash runs it as it is
 same("grep pi-bg-wait index.ts; echo 'x && pi-bg-wait bg1'", "plain");
 same('cd /tmp && pi -p "run `pi-bg-stop bg1 && pi-bg-wait bg7; ls`" < /dev/null', "plain");
@@ -107,6 +116,28 @@ same("pi-bg-wait bg1; echo 'then pi-bg-wait bg2'", m({ ops: [w("bg1")], joins: [
 	fire("agent_end");
 	await new Promise((r) => setTimeout(r, 50));
 	check("not sent again at agent_end", sent.length === 0, JSON.stringify(sent));
+	// `pi-bg-wait <id> <seconds>`: the seconds are the wait's timeout, the shorter of it and the call's
+	const text = (r: any) => r.content[0].text as string;
+	const run = (command: string, extra: Record<string, unknown> = {}) => tool.execute("c", { command, ...extra }, undefined, () => {}, ctx);
+	await run("sleep 4; echo slow-done", { background: true }); // bg2
+	let t0 = Date.now();
+	let out = text(await run("pi-bg-wait bg2 1", { timeout: 60 }));
+	check("wait with seconds returns at its own timeout", /bg2 is still running/.test(out) && Date.now() - t0 < 2500, out);
+	out = text(await run("pi-bg-wait bg2 --timeout 1"));
+	check("wait with --timeout", /bg2 is still running/.test(out), out);
+	t0 = Date.now();
+	out = text(await run("pi-bg-wait bg2 600", { timeout: 1 }));
+	check("the call's shorter timeout wins", /bg2 is still running/.test(out) && Date.now() - t0 < 2500, out);
+	await run("sleep 3; echo chain-done", { background: true }); // bg3
+	out = text(await run("cd /tmp && pi-bg-wait bg3 1 && pi-bg-wait 3 60"));
+	check("chain of waits with seconds", /== bg3\nbg3 is still running[\s\S]*== bg3\nBackground command bg3 finished: exit code 0[\s\S]*chain-done/.test(out), out);
+	await run("sleep 2; echo two-done", { background: true }); // bg4
+	out = text(await run("pi-bg-wait bg4 60; echo after-wait"));
+	check("mixed: wait with seconds, then bash", /== pi-bg-wait bg4\nBackground command bg4 finished[\s\S]*two-done[\s\S]*after-wait/.test(out), out);
+	const bad = await run("pi-bg-wait bg4 0").then(text, (e: Error) => e.message);
+	check("zero seconds is refused with the reason", /Invalid timeout 0/.test(bad), bad);
+	const or = await run("pi-bg-wait bg4 5 || date").then(text, (e: Error) => e.message);
+	check("|| is still refused", /answered by this tool/.test(or), or);
 	fire("session_shutdown");
 	fs.rmSync(dir, { recursive: true, force: true });
 }

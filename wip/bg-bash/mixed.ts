@@ -19,9 +19,12 @@
  * a pipe next to one, a redirection other than `>/dev/null`, `2>/dev/null`, `2>&1`, or a pipe out of one other than
  * `| tail …` / `| head …` (both only trim the wait's own, already capped, output). A wait or stop that is only quoted
  * text (a commit message, a prompt, `echo`) gives "plain": the command runs as it is.
+ *
+ * A wait may carry its own timeout in seconds after the id (`pi-bg-wait bg1 600`, `--timeout 600`): see WAIT_SECS in
+ * index.ts.
  */
 
-export type BgOp = { kind: "wait" | "stop"; id: string };
+export type BgOp = { kind: "wait" | "stop"; id: string; seconds?: number };
 type Sep = "&&" | ";" | "||" | "|" | "&";
 type Joiner = "&&" | ";";
 export type Mixed = {
@@ -36,7 +39,7 @@ export type Mixed = {
 	after: string;
 };
 
-const OP = /^\s*pi-bg-(wait|stop)\s+((?:bg|loop)?\d+)((?:\s+(?:>\s*\/dev\/null|2>\s*\/dev\/null|2>&1|&>\s*\/dev\/null))*)\s*$/;
+const OP = /^\s*pi-bg-(wait|stop)\s+((?:bg|loop)?\d+)(?:\s+(?:(?:--timeout|-t)(?:=|\s+))?(\d+)s?)?((?:\s+(?:>\s*\/dev\/null|2>\s*\/dev\/null|2>&1|&>\s*\/dev\/null))*)\s*$/;
 const PIPE_TAIL = /^\s*(?:tail|head)(?:\s+-[a-zA-Z]*\s*\d*|\s+\d+)*\s*$/;
 const SETUP = /^\s*(?:cd|source|\.|export)(?:\s|$)/;
 // a wait or stop in command position, as the caller's MIXED_WAIT tests it
@@ -134,7 +137,8 @@ export function splitMixed(command: string): Mixed | "plain" | undefined {
 	for (let i = first; i <= last; i++) {
 		const m = OP.exec(segs[i])!;
 		if (m[1] === "wait" && m[2].startsWith("loop")) return undefined;
-		ops.push({ kind: m[1] as BgOp["kind"], id: /^\d+$/.test(m[2]) ? `bg${m[2]}` : m[2] });
+		if (m[1] === "stop" && m[3]) return undefined; // seconds belong to a wait
+		ops.push({ kind: m[1] as BgOp["kind"], id: /^\d+$/.test(m[2]) ? `bg${m[2]}` : m[2], ...(m[3] ? { seconds: Number(m[3]) } : {}) });
 	}
 	const opJoins = seps.slice(first, last) as Joiner[];
 	const hasBefore = first > 0;
