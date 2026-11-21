@@ -21,3 +21,6 @@ node_modules/
 AGENTS.override.md
 wip/pi-maint/
 wip/review-replay/cases.txt
+wip/pi-update-1.6/before/
+wip/pi-update-1.6/*.err
+wip/pi-update-1.6/web-verify.log

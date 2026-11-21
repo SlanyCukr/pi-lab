@@ -32,6 +32,10 @@ interface Trim {
 	params?: Record<string, string>;
 }
 
+// When to delegate lives here, not in the system prompt (2026-11-21). Anthropic's Fable 5.2 guide: a sub-agent tool's
+// description states what a sub-agent costs, when delegation is worth it and when not, and how to brief one; its
+// context-engineering post: instructions for a tool go in its description, once. The append's "Delegation" list said
+// `Explore` "handles" all searching beyond open files, a standing order written when Explore was the cheap model.
 const subagentRewrite = (original: string): string | undefined => {
 	const lines = original.split("\n");
 	const start = lines.findIndex((l) => l.trim() === "Custom agents:");
@@ -45,6 +49,8 @@ const subagentRewrite = (original: string): string | undefined => {
 	return [
 		"Run a sub-agent with fresh context on a self-contained task. Agent types:",
 		...agents,
+		"A sub-agent sees none of this conversation and returns only its report: what it reads stays out of your context, and it costs its own tokens and a round trip. Worth it for a search or a read across many files when you need only the conclusion, for independent questions sent as parallel calls, and for a reviewer's fresh look at a risky change. Not worth it for one known file, a file you are about to edit, a fact one grep answers, or a second check of routine work.",
+		"Brief it as you would a capable colleague who has no context: the question, what you already know, where to look, and the form and length of the answer. A long spec goes in a file; pass the path. Its report is evidence to check; its full transcript is at the output path in its result.",
 		"Foreground calls run one at a time; run_in_background: true returns an id at once and you are notified when it finishes.",
 		"get_subagent_result reads a result, steer_subagent redirects a running agent, resume continues one. Results come back as text.",
 	].join("\n");
@@ -123,7 +129,8 @@ const TRIMS: Record<string, Trim> = {
 		},
 	},
 	advisor: {
-		description: "Ask a stronger reviewer model for guidance, then continue. Your whole conversation is forwarded automatically; no parameters.",
+		// "a stronger reviewer model" until 2026-11-21: false in a Fable session, where the advisor (Opus 5.5) is the smaller model
+		description: "Ask a second model for guidance, then continue. It reads your whole conversation with a fresh view and answers with one recommendation; no parameters.",
 	},
 	subagent: {
 		rewrite: subagentRewrite,

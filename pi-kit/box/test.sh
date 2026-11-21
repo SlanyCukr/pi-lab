@@ -35,7 +35,7 @@ for needle in "ADHD-shaped output" "GitHub Copilot plan" "grill-me" "diagnose" "
 done
 echo "-- sub-agent types listed in the subagent tool:"
 echo "$first" | jq -r '.tools[] | select(.function.name=="subagent") | .function.description' \
-  | grep -oE '^- (Explore|builder|reviewer|explore-glm):' | tr '\n' ' '; echo
+  | grep -oE '^- (Explore|reviewer|explore-glm):' | tr '\n' ' '; echo
 echo "-- model per request (main = 18 tools, child = fewer):"
 jq -r '"\(.model) tools=\(.tools|length)"' "$LOG" | sort | uniq -c
 echo "-- tool results returned to main session:"

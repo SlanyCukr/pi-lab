@@ -44,4 +44,11 @@ assert.equal(out15, "You are a coding assistant running inside pi.\n\n<rules>\n-
 // the trailer pi-web's older pi wrote, and a section with no tools listed (left alone)
 assert.equal(mod.trimSystemText("P\n\n<tools>\n- a: b\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<cwd>\n/x\n</cwd>"), "P\n\n<cwd>\n/x\n</cwd>");
 assert.equal(mod.trimSystemText("P\n\n<tools>\n(none)\n\nAdditional tools may be available.\n</tools>"), "P\n\n<tools>\n(none)\n\nAdditional tools may be available.\n</tools>");
-console.log("tool-trim: all payload shapes trimmed, hidden params dropped, 1.5 tools section dropped (13 checks)");
+// the subagent description keeps the host's agent list and carries when to delegate (2026-11-21: moved out of the
+// system prompt); a description without the list marker is left as the host wrote it
+const sub = mod.trimTool({ name: "subagent", description: "Long intro.\nCustom agents:\n- Explore: finds code\n- reviewer: reviews\n\nMore host text.", input_schema: { type: "object", properties: prop(["prompt", "model"]) } });
+assert.ok(sub.description.includes("- Explore: finds code\n- reviewer: reviews\n"), sub.description);
+for (const part of ["sees none of this conversation", "Not worth it for one known file", "Brief it as you would"]) assert.ok(sub.description.includes(part), part);
+assert.ok(!sub.description.includes("More host text") && !("model" in sub.input_schema.properties));
+assert.equal(mod.trimTool({ name: "subagent", description: "No list here.", input_schema: { type: "object", properties: {} } }).description, "No list here.");
+console.log("tool-trim: all payload shapes trimmed, hidden params dropped, 1.5 tools section dropped, subagent description (18 checks)");

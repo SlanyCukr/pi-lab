@@ -19,7 +19,8 @@ def read(path):
     if not os.path.isfile(path):
         return None
     t = open(path, errors="replace").read()
-    v = re.search(r"^[*# -]*VERDICT: *(pass|fail)", t, re.M | re.I)
+    # also `**VERDICT:** fail` and `VERDICT: **fail**`: another model need not write the line as Opus does
+    v = re.search(r"^[*# -]*VERDICT[*: ]*(pass|fail)", t, re.M | re.I)
     n = len(re.findall(r"^\s*- ", t.split("Follow-ups:", 1)[1], re.M)) if "Follow-ups:" in t else 0
     h = dict(re.findall(r"^(secs|cost|by): (.*)$", t, re.M))
     return {"v": v.group(1).lower() if v else "none", "fu": n, "secs": int(h.get("secs", 0) or 0), "cost": float(h.get("cost", 0) or 0), "text": t}

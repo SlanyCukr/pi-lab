@@ -12,7 +12,11 @@
 # What differs from the original review, for every arm alike (so compare the arms with each other first):
 # - the checkout has no node_modules or Python environment, so the reviewer reads and reasons but cannot re-run tests;
 # - ledger.md and done.md are today's copies (a done finding's row has moved to done.md);
-# - the loop's state is only read: the checkout is a worktree of a `git clone --shared` under $REPLAY_ROOT.
+# - the loop's state is only read: the checkout is its own repository under $REPLAY_ROOT that borrows the live
+#   repository's objects and has the reviewed head as its only ref, so `git log --all` ends at that head. (A clone of
+#   the live worktree also held every later commit, and the next commit after a failed review is its fix.)
+# What still leaks: today's ledger.md, done.md and specs/ can describe what happened after the review.
+# A case with no answer (timeout, usage limit) leaves <head>.failed, not <head>.txt, and is tried again on a rerun.
 set -euo pipefail
 model=$1 thinking=$2 cases=$3
 S=${FG_STATE:-$HOME/projects/media_monitoring.find-gaps/.find-gaps}
@@ -21,7 +25,7 @@ R=${REPLAY_ROOT:-/tmp/review-replay}
 out=${4:-$HOME/pi-lab/reviews/review-replay/${model//\//_}-$thinking}
 agent=${REPLAY_AGENT:-$HOME/.pi/agent/agents/reviewer.md}
 mkdir -p "$R" "$out/sessions"
-[ -d "$R/repo" ] || git clone -q --shared --no-checkout "$LIVE" "$R/repo"
+objects=$(cd "$LIVE" && cd "$(git rev-parse --git-common-dir)" && pwd)/objects
 tools=$(awk -F': *' '/^tools:/{print $2; exit}' "$agent" | tr -d ' ')
 body=$R/reviewer-body.md
 awk 'n >= 2; /^---$/ {n++}' "$agent" > "$body"
@@ -34,7 +38,9 @@ grep -vE '^\s*(#|$)' "$cases" | while read -r head _; do
   src=$(grep -l -m1 -F "commit(s) $base..$head" "$S"/sessions/reviews/*/*.jsonl 2>/dev/null | head -1 || true)
   [ -n "$src" ] || { echo "${head:0:9}: no review session with its prompt, skipped"; continue; }
   wt=$R/wt-${head:0:12}
-  git -C "$R/repo" worktree add -q --detach "$wt" "$head" 2>/dev/null || { echo "${head:0:9}: cannot check out, skipped"; continue; }
+  [ ! -e "$wt" ] || (cd "$R" && rm -rf "./wt-${head:0:12}")
+  git init -q "$wt" && echo "$objects" > "$wt/.git/objects/info/alternates"
+  git -C "$wt" checkout -q --detach "$head" 2>/dev/null || { echo "${head:0:9}: cannot check out, skipped"; continue; }
   mkdir -p "$wt/.find-gaps"
   cp "$S/ledger.md" "$S/done.md" "$wt/.find-gaps/"
   [ -d "$S/specs" ] && cp -r "$S/specs" "$wt/.find-gaps/specs"
@@ -53,8 +59,13 @@ grep -vE '^\s*(#|$)' "$cases" | while read -r head _; do
     cost=$(jq -rs '[.[] | select(.type == "message" and .message.role == "assistant") | .message.usage.cost.total // 0] | add // 0' "$f")
     used=$(jq -rs '[.[] | select(.type == "message" and .message.role == "assistant") | .message.model // empty] | unique | join(",")' "$f")
   fi
+  (cd "$R" && rm -rf "./wt-${head:0:12}")
+  if [ -z "$answer" ]; then
+    grep -v '^Warning: Extension package ' "$out/$head.err" | tail -2 > "$out/$head.failed"
+    echo "${head:0:9}: NO ANSWER ($(tr '\n' ' ' < "$out/$head.failed" | cut -c1-120)), will be tried again"; continue
+  fi
+  rm -f "$out/$head.failed"
   { echo "base: $base"; echo "head: $head"; echo "by: $model ($thinking; answered by: ${used:-none})"; echo "secs: $(( $(date +%s) - t0 ))"; echo "cost: $cost"; echo
-    printf '%s\n' "${answer:-NO ANSWER: $(grep -v '^Warning: Extension package ' "$out/$head.err" | tail -2 | tr '\n' ' ')}"; } > "$out/$head.txt"
-  git -C "$R/repo" worktree remove --force "$wt"
-  echo "${head:0:9}: $(grep -m1 -ioE 'VERDICT: *(pass|fail)|NO ANSWER.*' "$out/$head.txt" | cut -c1-120) in $(( $(date +%s) - t0 )) s, \$$cost"
+    printf '%s\n' "$answer"; } > "$out/$head.txt"
+  echo "${head:0:9}: $(grep -m1 -ioE 'VERDICT:[* ]*(pass|fail)' "$out/$head.txt" | cut -c1-120) in $(( $(date +%s) - t0 )) s, \$$cost"
 done
