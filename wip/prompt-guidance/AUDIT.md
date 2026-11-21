@@ -110,14 +110,24 @@ grader needs the OpenAI login.
 - **No thinking instructions, no token budget, no deadline shown to the model** in any prompt: checked with grep
   over the append, the agents, the advisor prompt, `SKILL.md`, `run.sh` and the harness-review prompt. Nothing to do.
 
+## Third pass: the loop's skill (the user: "Improve the SKILL.md")
+
+8. **`SKILL.md` is split by when it is needed** (rule 9). Every cycle got all 54.6 KB in its first message. It now
+   gets 35.0 KB; `DISCOVER.md` (11.3 KB) is read by a discovery pass and `OPERATE.md` (9.3 KB) for the user's
+   commands, a launch, the profile cycle and pull-request runs. Paragraphs moved verbatim. Removed: the builder
+   sub-agent that no longer exists, two cautions for "older ledgers", one sentence the edit tool's description now
+   says, and a discovery rule that contradicted the cycle prompt (rule 2). The 221 runner checks pass. Detail and
+   rollback: `wip/find-gaps/DESIGN.md`, "SKILL.md split by when it is needed".
+9. **The product repository's own prompts** (three `AGENTS.md` files, 40 KB, and the product's model prompts) went
+   to the loop as a request with this guidance file's path.
+
+Measured before the split: a build cycle has a median of 50 turns and a cache read costs $0.20 per million tokens,
+so the first estimate of $7 a day was wrong. Moving 19.6 KB out of every build cycle saves about $0.12 a cycle,
+about $2.50 a day.
+
 ## Open
 
-- **`SKILL.md` is 54 KB and every loop cycle reads all of it.** A split by cycle kind (rule 9) would save a build
-  cycle about 3,300 tokens on every turn, roughly $7 a day (estimate, not measured). It is not a cut-and-paste: the
-  build steps cite the scoring rule inside "discover", and the "headless" section is one 4.6 KB paragraph that
-  mixes build and discovery instructions. It needs its own rewrite and real cycles to check it.
-- Explorers do not read `SKILL.md` (0 of 283 sub-agent sessions on 11-20 and 11-21), so there is nothing to split
-  for them.
+- Whether the first build cycle and the first discovery pass on the split skill behave as before (watched).
 
 Rollback of the second pass: `git -C ~/pi-lab show 2a08e8c:<path>` for `pi-kit/home/.pi/agent/APPEND_SYSTEM.md`,
 `pi-kit/home/.pi/agent/agents/Explore.md`, `pi-kit/home/.pi/agent/agents/reviewer.md`,
