@@ -17,51 +17,22 @@
 // running set is empty. If a terminal event were ever missed the set would stay non-empty and this extension
 // would simply stay quiet, which is the safe direction.
 //
-// Compact on return (harness review 2026-11-05): a user message after more than PI_COMPACT_IDLE_MIN (65) minutes idle
-// finds the 1 h prompt cache expired, so its turn re-writes the whole context at the 1 h write price (2x input).
-// 40 such turns over 150k tokens in 30 days cost $87.53 (11-04 09:45: 371,751 tokens, $3.01). When the context
-// is over PI_COMPACT_IDLE_TOKENS (150k), the message waits for a compaction first: pi serializes the older history
-// with tool output cut short (test: 1,459 summary input tokens for a 49k context, no cache write), and the turn and
-// the turns after it carry the summary plus the last ~20k tokens instead of the whole history.
-// Each return after the idle limit leaves a `compact-at-idle` custom entry in the session (never sent to the model):
-// idle minutes, tokens, and compacted / skipped with the reason / failed with the error (harness review 2026-11-06:
-// on 11-05 a 22 h return at 389k tokens re-wrote the cache for $3.15 and left no trace of why it did not compact).
-//
 // Size after failed retries (harness review 2026-11-11): pi omits each failed request (a 429, an overload) with a
 // context_edit entry, and any context_edit after the last response makes getContextUsage() drop that response's real
-// count for a chars/4 estimate of every message, which misses Fable's redacted thinking. On 11-11 a 568 min return
-// after eight 429s read 112,190 tokens against a real 220,929, skipped as "under the token limit", and re-wrote
-// 211,530 tokens ($3.38). contextTokens() takes the larger of the two while every edit since the response only
-// omits a failed or aborted request; a compaction or any other edit leaves pi's number as it is.
+// count for a chars/4 estimate of every message, which misses Fable's redacted thinking (11-11: 112,190 read against
+// a real 220,929). contextTokens() takes the larger of the two while every edit since the response only omits a
+// failed or aborted request; a compaction or any other edit leaves pi's number as it is.
 //
-// Compact before a background result (harness review 2026-11-14, the user's pick on 11-13): a bg-bash result, monitor
-// line or loop tick that wakes an idle session meets the same expired cache, and the user-message check never saw it
-// (it is no `input`). 11 such wake-ups in 30 days re-wrote $22.36; 11-14 02:40 UTC: 223,821 tokens, $3.60, 136 min after
-// the last turn. bg-bash now asks on the session's event bus before it starts a turn from idle
-// (`bg-bash:before-wake`, a gate object with the ctx); under the same limits this extension sets `gate.hold` and
-// compacts, and bg-bash looks again once the compaction is over. One try per idle period, so a failed compaction
-// lets the result through on the full context. The result is not lost meanwhile: it stays in bg-bash's queue.
-//
-// Compact while idle (2026-11-14, the user: "do it proactively before user actually send message"): compact-on-return
-// makes the user's message wait for the summary (11-14: 51k output tokens before "What it does?" got its answer). So a
-// timer does the same compaction once the idle limit has passed, while nobody waits: same limits, same function,
-// entry `by: "timer"`. Not earlier than the limit: until then a return finds a warm cache, which a compaction would
-// throw away; the summary call itself never reads the cache (0 cached tokens in 19 compactions), so it costs the same
-// before or after the expiry. pi-web unloads an idle session after 10 min (PI_WEB_IDLE_TIMEOUT_MS), timer included,
-// so a session over the token limit is held through pi-web's session-liveness registry until the timer has run
-// (bg-bash holds its sessions the same way). A message sent during the compaction is refused by pi ("Cannot submit a
-// prompt while compaction is in progress"); pi-web parks it and sends it when the compaction ends. Sessions
-// nobody returns to pay one summary for nothing: 3 in 30 days against 9 compacted returns. PI_COMPACT_IDLE_PROACTIVE=0
-// turns the timer and the hold off (compact-on-return stays).
+// No compaction around an expired prompt cache (removed 2026-11-21, the user: "completely delete the autocompact
+// feature"). From 11-05 to 11-21 a session idle for 65+ min at 150k+ tokens was compacted on the user's return, before
+// a bg-bash wake-up and by a timer. The timer never ran for a session started outside pi-web, so the user's message
+// waited for the summary instead; and it does not happen often. A cold return re-writes the whole context once
+// (about $3 at 370k tokens); `/compact` before leaving a big session avoids that.
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const PERCENT = Number(process.env.PI_COMPACT_AT_PERCENT ?? 40);
 const FIXED_TOKENS = process.env.PI_COMPACT_AT_TOKENS ? Number(process.env.PI_COMPACT_AT_TOKENS) : undefined; // test hook
 const DEBUG = !!process.env.PI_COMPACT_AT_DEBUG;
-const IDLE_MS = Number(process.env.PI_COMPACT_IDLE_MIN ?? 65) * 60_000;
-const IDLE_TOKENS = Number(process.env.PI_COMPACT_IDLE_TOKENS ?? 150_000);
-const PROACTIVE = process.env.PI_COMPACT_IDLE_PROACTIVE !== "0";
-const HOLD_SLACK_MS = 60_000; // the hold outlasts the timer; pi-web keeps a compacting session by itself
 
 const INSTRUCTIONS = [
 	"Preserve exactly: the user's goal and standing instructions; decisions made and the reason for each;",
@@ -81,12 +52,6 @@ export default function (pi: ExtensionAPI) {
 	// After a compaction, stay quiet until context has grown well past what compaction left behind,
 	// so a summary that is itself above the limit cannot cause a loop.
 	let suppressBelow = 0;
-	// Time of the last provider response, for the idle check; 0 until this process saw a turn (then read from the session).
-	let lastTurnAt = 0;
-	// Compact while idle: the timer of the current idle period, and how long pi-web is asked to keep the session.
-	let idleTimer: ReturnType<typeof setTimeout> | undefined;
-	let holdUntil = 0;
-	let releaseLiveness: (() => void) | undefined;
 
 	const log = (msg: string) => DEBUG && console.error(`[compact-at] ${msg}`);
 
@@ -115,15 +80,6 @@ export default function (pi: ExtensionAPI) {
 		return isChild;
 	};
 
-	const lastAssistantAt = (ctx: ExtensionContext) => {
-		const branch = ctx.sessionManager.getBranch();
-		for (let k = branch.length - 1; k >= 0; k--) {
-			const e: any = branch[k];
-			if (e?.type === "message" && e.message?.role === "assistant") return Date.parse(e.timestamp) || 0;
-		}
-		return 0;
-	};
-
 	const lastResponseTokens = (ctx: ExtensionContext): number | undefined => {
 		const branch: any[] = ctx.sessionManager.getBranch();
 		const failed = (e: any) =>
@@ -146,144 +102,7 @@ export default function (pi: ExtensionAPI) {
 		return { usage, tokens: real && usage?.tokens != null ? Math.max(usage.tokens, real) : usage?.tokens };
 	};
 
-	// What wakes a session after the idle limit (a user message, or a bg-bash result) waits for a compaction when the
-	// context is over the token limit. Resolves when the compaction is over, or at once when there is none to do.
-	// `what` names the waker in the notice ("your message"); `by` marks a wake by bg-bash in the session entry.
-	const compactIdle = async (ctx: ExtensionContext, idle: number, what: string, by: Record<string, unknown>, busy?: string): Promise<void> => {
-		const { tokens } = contextTokens(ctx);
-		const record = (outcome: string, extra: Record<string, unknown> = {}) => {
-			log(`${what}: idle=${Math.round(idle / 1000)}s tokens=${tokens} ${outcome}`);
-			try {
-				pi.appendEntry("compact-at-idle", { idleMin: Math.round(idle / 60_000), tokens, outcome, ...by, ...extra });
-			} catch (e: any) {
-				log(`appendEntry failed: ${e?.message}`);
-			}
-		};
-		const skip = busy ? busy : running ? "compaction running" : tokens == null ? "context size unknown"
-			: tokens <= IDLE_TOKENS ? "under the token limit" : runningAgents.size > 0 ? "sub-agents running" : "";
-		if (skip) return record(`skipped: ${skip}`);
-		running = true; // set before the first await: the bg-bash gate reads it right after this call
-		try {
-			try {
-				ctx.ui.notify(`${by.by === "timer" ? "Compacting while idle" : "Compacting first"}: ${Math.round(tokens! / 1000)}k tokens after ${Math.round(idle / 60_000)} min idle (the prompt cache expired)`, "info");
-			} catch (e: any) {
-				log(`notify failed: ${e?.message}`);
-			}
-			await new Promise<void>((resolve) =>
-				ctx.compact({
-					customInstructions: INSTRUCTIONS,
-					onComplete: (result: any) => {
-						const after = result?.estimatedTokensAfter ?? result?.tokensAfter;
-						if (typeof after === "number") suppressBelow = Math.floor(after * 1.5);
-						record("compacted", { tokensAfter: after });
-						resolve();
-					},
-					onError: (error: any) => {
-						// the waker still goes out, on the full context; say so, since that turn re-writes the whole cache
-						record("failed", { error: String(error?.message ?? error) });
-						try {
-							ctx.ui.notify(`Compacting first failed (${error?.message}); ${what} goes out on the full context`, "warning");
-						} catch (e: any) {
-							log(`notify failed: ${e?.message}`);
-						}
-						resolve();
-					},
-				}),
-			);
-		} catch (e: any) {
-			record("failed", { error: String(e?.message ?? e) }); // ctx.compact threw before starting
-		} finally {
-			running = false; // a throw must not leave the 40 % trigger disabled for the rest of the session
-		}
-	};
-
-	// Compact while idle: see the header. Armed at every turn end; a later turn re-arms it, so it fires once per idle period.
-	const armIdle = (ctx: ExtensionContext) => {
-		clearTimeout(idleTimer);
-		idleTimer = undefined;
-		holdUntil = 0;
-		if (!PROACTIVE) return;
-		const armedFor = lastTurnAt;
-		const { tokens } = contextTokens(ctx);
-		if (tokens != null && tokens > IDLE_TOKENS) holdUntil = armedFor + IDLE_MS + HOLD_SLACK_MS;
-		idleTimer = setTimeout(async () => {
-			try {
-				if (armedFor !== lastTurnAt || running) return;
-				// a long tool call or a queued message: no compaction under a run (it would abort it); its turn end re-arms
-				if (!ctx.isIdle() || ctx.hasPendingMessages()) return;
-				const now = contextTokens(ctx).tokens;
-				if (now == null || now <= IDLE_TOKENS) return; // nothing worth a summary: no entry either
-				await compactIdle(ctx, Date.now() - armedFor, "the next message", { by: "timer" });
-			} catch (e: any) {
-				log(`idle timer failed: ${e?.message}`); // a stale ctx (session replaced): compact-on-return still applies
-			} finally {
-				if (armedFor === lastTurnAt) holdUntil = 0;
-			}
-		}, IDLE_MS + 1000);
-		idleTimer.unref?.(); // never the reason a pi process stays alive
-	};
-
-	pi.on("session_start", (_event: any, ctx: ExtensionContext) => {
-		clearTimeout(idleTimer);
-		holdUntil = 0;
-		lastTurnAt = 0; // another session's turn time says nothing about this one: read it from the session
-		releaseLiveness?.();
-		releaseLiveness = undefined;
-		if (!PROACTIVE) return;
-		try {
-			const liveness = (globalThis as any)[Symbol.for("@agegr/pi-web/session-liveness/v1")];
-			const sessionId = ctx.sessionManager.getSessionId();
-			if (liveness?.version !== 1 || !sessionId) return;
-			releaseLiveness = liveness.register({
-				name: "compact-at",
-				sessionId,
-				sessionFile: ctx.sessionManager.getSessionFile() || undefined,
-				isActive: () => Date.now() < holdUntil,
-			});
-		} catch (e: any) {
-			log(`liveness registration failed: ${e?.message}`); // eviction stays as it was; compact-on-return still applies
-		}
-	});
-
-	pi.on("session_shutdown", () => {
-		clearTimeout(idleTimer);
-		holdUntil = 0;
-		releaseLiveness?.();
-		releaseLiveness = undefined;
-	});
-
-	pi.on("input", async (event: any, ctx: ExtensionContext) => {
-		if (event?.source === "extension" || !ctx.hasUI || checkChild()) return { action: "continue" };
-		const last = lastTurnAt || lastAssistantAt(ctx);
-		const idle = last ? Date.now() - last : 0;
-		if (idle <= IDLE_MS) return { action: "continue" };
-		await compactIdle(ctx, idle, "your message", {}, event?.streamingBehavior ? "agent running" : undefined);
-		return { action: "continue" };
-	});
-
-	// bg-bash is about to start a turn from idle (a background result, monitor lines, a loop tick): see the header.
-	let wakeTriedFor = 0; // the idle period (the time of its last turn) a wake compaction was tried for
-	pi.events.on("bg-bash:before-wake", (gate: any) => {
-		const ctx: ExtensionContext | undefined = gate?.ctx;
-		try {
-			if (!ctx?.hasUI || checkChild()) return;
-			if (running) {
-				gate.hold = true; // a compaction is going on: the turn waits for its end
-				return;
-			}
-			const last = lastTurnAt || lastAssistantAt(ctx);
-			const idle = last ? Date.now() - last : 0;
-			if (idle <= IDLE_MS || wakeTriedFor === last) return;
-			wakeTriedFor = last;
-			void compactIdle(ctx, idle, "the background result", { by: "bg-bash" });
-			if (running) gate.hold = true;
-		} catch (e: any) {
-			log(`before-wake failed: ${e?.message}`); // a stale ctx: the result goes out as it would have
-		}
-	});
-
 	pi.on("turn_end", (event: any, ctx: ExtensionContext) => {
-		lastTurnAt = Date.now();
 		if (checkChild()) {
 			log("child session: inert");
 			return;
@@ -292,7 +111,6 @@ export default function (pi: ExtensionAPI) {
 			log("print/json mode: inert");
 			return;
 		}
-		armIdle(ctx);
 		if (running) return;
 		const { usage, tokens } = contextTokens(ctx);
 		const limit = FIXED_TOKENS ?? (usage?.contextWindow ? Math.floor((usage.contextWindow * PERCENT) / 100) : undefined);
