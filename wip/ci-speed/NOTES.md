@@ -83,3 +83,20 @@ Not built: a runner flag for commits that change the checks. The review prompt a
 weakened or deleted test, and the 12 check-changing commits of the last 14 days show no weakening that hurt (two
 loosened the npm audit gate with a stated reason, one raised a timeout). The project asks each deletion commit to
 name its evidence instead.
+
+## A second machine as a runner: tried, switched off (2026-11-21 evening)
+
+The user has two more Pis. The Pi 4 (4 GB, SD card) is too slow and small. The other Pi 5 (8 GB, the user's home
+server, about 2 GB of memory available) got a runner under its own user without sudo: rootless podman behind the
+docker CLI, label `mm-checks`. By hand, a Postgres service container and the Playwright-style
+`docker run --network=host --user $(id -u)` both worked there.
+
+The first real job (the database contract job on a scratch branch) passed checkout, uv, Node, migrate and seed, and
+then hung the whole host three minutes into `npm ci` + `next build`; the hardware watchdog reset it. All services
+came back clean. The mistake was mine: I planned to measure memory on the first run and cap it afterwards. The cap
+(`MemoryMax` on the runner user's slice, no swap) comes first.
+
+Expected gain if it ran: the two check jobs side by side, about 6 minutes off each deploy (20.6 to about 15 min at
+the median, estimate). The workflow change it needs is small: a `runs-on` label for the contract job, and `$HOME`
+instead of `/home/pi` for its venv and build cache. Not sent to the loop; the runner is off until the user decides
+whether that host gets the memory.
