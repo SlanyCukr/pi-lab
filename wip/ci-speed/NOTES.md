@@ -71,3 +71,15 @@ The 6,012 backend tests did not fail once in CI. That is not proof they are usel
 every push, and those local failures are not logged per test. Half of the backend tests take about 2 % of the
 time, so deleting tests by count shortens CI little; deleting or fixing the slow ones does.
 
+
+## Sent to the loop (2026-11-21 18:45, the user: "go with your pick and do it now")
+
+One project, five parts: record per-test results and durations; speed up the measured hot spots; "without letting
+it lie" rules; prune by mutation testing (not by "never failed"); property tests. Rented runners, tool swaps and a
+merge queue are left out. Baseline to judge it against: push to deployed p50 20.6 min, vitest 125 s, pytest 454 s,
+6,012 backend and 1,338 frontend unit tests.
+
+Not built: a runner flag for commits that change the checks. The review prompt already fails a review for a
+weakened or deleted test, and the 12 check-changing commits of the last 14 days show no weakening that hurt (two
+loosened the npm audit gate with a stated reason, one raised a timeout). The project asks each deletion commit to
+name its evidence instead.
