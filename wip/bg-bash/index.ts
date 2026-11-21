@@ -867,12 +867,16 @@ export default function (pi: ExtensionAPI) {
 	// two find each other on this session's event bus; whichever loads second completes the handshake
 	// (see tool-groups' READY/BASH). pi spreads this definition per row, after every extension has
 	// loaded, so the getter sees the result.
+	// When to use background and monitor is said here, in the tool's description, and not also as guideline lines in
+	// the system prompt (2026-11-21; Anthropic's context-engineering post: a tool's instructions go in its description,
+	// once). tool-trim replaces this text with a shorter one that says the same.
 	const description =
 		`${stock.description} Set background: true for a command you would otherwise sit waiting on ` +
-		`(a CI watch, a long build or test run, a deploy): the call returns at once and the result arrives as a message when the command exits. ` +
+		`(a CI watch, a long build or test run, a deploy): run one command that exits when the thing is done, e.g. \`gh run watch <id> --exit-status\` or \`until grep -q Ready app.log; do sleep 2; done\`, instead of a sleep-and-check loop. The call returns at once and the result arrives as a message when the command exits. ` +
 		`In a sub-agent, background is ignored; instead a command still running after ${Math.round(AUTO_MS / 1000)}s returns with its output so far and you keep waiting with the command \`pi-bg-wait <id>\`. ` +
 		`Main session: monitor: true starts a watch instead, where every stdout line of the command reaches you as a message (batched about 1 s) while you carry on; ` +
 		`it expires after timeout (default ${MONITOR_DEFAULT_S}s, max ${MONITOR_MAX_S}s) unless persistent: true, which runs until \`pi-bg-stop <id>\` or the session ends. ` +
+		`A monitor is for a stream of events (new review comments, CI state changes, errors in a log): print only lines you would act on, failures included, and make the output line-buffered (grep --line-buffered, stdbuf -oL, python -u); more than ${MONITOR_FLOOD_LINES} lines a minute stops it. ` +
 		`\`pi-bg-stop <id>\` also stops a background command or a loop without a message.`;
 	let toolGroups: any;
 	const peer = {
@@ -898,11 +902,6 @@ export default function (pi: ExtensionAPI) {
 			toolGroups?.render("result", "bash", stock, value, theme, context, options) ??
 			(stock as any).renderResult(value, options, theme, context),
 		description,
-		promptGuidelines: [
-			...(stock.promptGuidelines ?? []),
-			"To wait for something slow (CI, a long build, a deploy), run one blocking command with bash background: true, e.g. `gh run watch <id> --exit-status`, instead of a sleep-and-check loop. You are woken with its output when it exits.",
-			`Use bash monitor: true to react to a stream of events (new review comments, CI state changes, errors in a log): the command prints one line per event and each line wakes you. Print only lines you would act on, failures included (grep --line-buffered, jq, a small poll-and-diff loop), never raw logs; more than ${MONITOR_FLOOD_LINES} lines a minute stops the monitor. Make output line-buffered (grep --line-buffered, stdbuf -oL, python -u). For a single "tell me when X is ready", use background: true with a command that exits then, e.g. \`until grep -q Ready app.log; do sleep 2; done\`.`,
-		],
 		parameters: Type.Object({
 			...(stock.parameters as any).properties,
 			background: Type.Optional(

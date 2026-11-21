@@ -61,28 +61,64 @@ and `2fa4f76:wip/tool-trim/index.ts` (copy the second to `~/.pi/agent/extensions
 A model run confirmed the new text arrives: it quoted the "Not worth it…" sentence and the advisor description, and
 said its system prompt has no "Delegation:" list.
 
+## Second pass, the same day (the user: "Why don't we actually make the edits")
+
+The first pass changed four things and left the rest because each rule traced to a past failure. That kept text the
+guidance says to move or merge. This pass made those edits.
+
+5. **Every tool's when-to-use text is in its description, once** (`tool-trim`, `bg-bash`, `advisor.json`). Out of
+   the system prompt: the append's "Tool use" section (filter output, `gh`, edit instead of `sed -i`), the two
+   bash guideline lines (background, monitor), pi's write line, the read-before-edit line, and the advisor's
+   when-to-call rules. Into the descriptions of `bash`, `edit`, `write` and `advisor`. The `<rules>` block went from
+   1,790 to 243 characters. One advisor line stays there (repeat the advice in the reply): it is about the reply,
+   and an empty list makes the package fall back to its own seven lines.
+6. **The append says each thing once.** Who decides what was stated three times (Working rules, Delivering work,
+   the "Execution" paragraph); it is now one paragraph in Working rules, which also names what waits for the user,
+   as the Fable guide asks. The bullet "A second issue found along the way" repeated "Completeness" and is gone.
+   8,209 to 7,181 characters.
+7. **`Explore` and `reviewer` prompts give the reason and drop the bare "never"s.** Each opens with who reads the
+   report and what they do with it (the caller acts without opening the files; a gate ships on the verdict). The
+   rules are the same rules. `explore-glm` keeps the old wording: it is a weaker model and is off on this host.
+
+Sizes, main session in `~/pi-lab` (characters): system prompt 27,089 to 24,514; tool definitions 11,623 to 13,520;
+total 38,712 to 38,034. An explorer has no bash, edit or advisor, so it only loses text: about 2,600 characters.
+
+### Checks (regressions looked for; none found)
+
+| Check | Before | After |
+|---|---|---|
+| Rename a setting in 5 files (2 runs): edits through `edit`, files written through bash | 6 and 6, 0 | 7 and 6, 0 |
+| "Thinking out loud" question (2 runs): files changed | 0, 0 | 0, 0 |
+| Add a CLI flag (2 runs): ran the tests, ended with an offer | yes, no | yes, no |
+| Wait for a 70 s deploy (2 runs, RPC): `background: true` used, foreground sleep | 2 of 2, 1 | 2 of 2, 0 |
+| Those 8 runs, cost | $2.48 | $2.13 |
+| Explorer test (`wip/model-ab/explore`, 8 questions x 2, Opus 5.5 medium): fully correct | 16 of 16 | 16 of 16 |
+| Same: $ and seconds per task, citations | $0.144, 35 s, 309 | $0.141, 34 s, 266 |
+| Review replay, one failed and one clean case (Opus 5.5 high) | fail (same defect), pass | fail (same defect), pass |
+
+These show the rules still hold from their new place. They do not show a gain: the old prompts already passed
+every check, and the explorer test is at its ceiling. The measured gain of the day is the delegation change above.
+The rule-following eval of 09-30 (`wip/pi-eval`) could not be run here: its cases are laptop sessions and its
+grader needs the OpenAI login.
+
 ## Left alone, with the reason
 
-- **`Explore.md` and `reviewer.md` prompts.** Each rule in them comes from a recorded failure (invented line
-  numbers, pasted code blocks, a first finding returned as the whole review). Their "never" lines carry a scope.
-  The Opus 5.5 guide says review needs no special prompt. Nothing in the guides argues against them.
 - **The response-style budgets** ("about 8 lines", "at most 5 bullets"). The guide says to add length instructions
-  where wanted; these are the user's choice for an ADHD reader. Both the before and the after answers ran to about
-  20 lines on an "explain" question, so the budget is not what limits them.
-- **The two `Example: {…}` lines in tool descriptions** (`lens_diagnostics`, `lsp_navigation`). The context post
+  where wanted; these are the user's choice for an ADHD reader.
+- **The two `Example: {...}` lines in tool descriptions** (`lens_diagnostics`, `lsp_navigation`). The context post
   says examples narrow what the model tries; these two exist because calls without them failed on argument shape.
-- **The advisor's when-to-use rules** stay in the system prompt (`advisor.json`). They are not repeated in the
-  description, and the call rate was tuned with them there.
 - **No thinking instructions, no token budget, no deadline shown to the model** in any prompt: checked with grep
   over the append, the agents, the advisor prompt, `SKILL.md`, `run.sh` and the harness-review prompt. Nothing to do.
-- **Capitals** (NEVER, MUST, CRITICAL, IMPORTANT, ALWAYS): 1 file had them (the advisor prompt, now fixed).
 
 ## Open
 
-- **`SKILL.md` is 54 KB and every loop cycle reads all of it.** The sections "discover" and "Lenses" (13 KB, 24 %)
-  matter only in a discovery pass. Split into a file a discovery pass reads (rule 9), a build cycle would carry
-  about 3,300 fewer tokens on every turn: roughly $0.25 a cycle and $7 a day at the current rates. This estimate was
-  not measured. Not done on 11-21 because the `Explore` model, the discovery pace and the pi version all change this
-  week, and one more loop change would blur each of them.
+- **`SKILL.md` is 54 KB and every loop cycle reads all of it.** A split by cycle kind (rule 9) would save a build
+  cycle about 3,300 tokens on every turn, roughly $7 a day (estimate, not measured). It is not a cut-and-paste: the
+  build steps cite the scoring rule inside "discover", and the "headless" section is one 4.6 KB paragraph that
+  mixes build and discovery instructions. It needs its own rewrite and real cycles to check it.
 - Explorers do not read `SKILL.md` (0 of 283 sub-agent sessions on 11-20 and 11-21), so there is nothing to split
   for them.
+
+Rollback of the second pass: `git -C ~/pi-lab show 2a08e8c:<path>` for `pi-kit/home/.pi/agent/APPEND_SYSTEM.md`,
+`pi-kit/home/.pi/agent/agents/Explore.md`, `pi-kit/home/.pi/agent/agents/reviewer.md`,
+`pi-kit/home/.config/rpiv-advisor/advisor.json`, `wip/tool-trim/index.ts` and `wip/bg-bash/index.ts`.

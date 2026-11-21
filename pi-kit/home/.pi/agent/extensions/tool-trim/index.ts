@@ -64,16 +64,27 @@ const TRIMS: Record<string, Trim> = {
 		description:
 			"Read a file. Text: at most 2000 lines or 50 KB per call; continue with offset/limit. Images (jpg, png, gif, webp, bmp) come back as attachments.",
 	},
+	// Since 2026-11-21 each tool's when-to-use text is here once, not also in the system prompt (Anthropic's
+	// context-engineering post: instructions for a tool go in its description). Moved in: the append's "Tool use"
+	// section (filter output, gh, edit instead of sed), bg-bash's two guideline lines (background, monitor), pi's
+	// write guideline and the read-before-edit line. Explorers have no bash or edit, so they no longer carry any of it.
 	bash: {
 		description:
 			"Run a bash command in the working directory. Returns stdout and stderr, the last 2000 lines or 50 KB; when cut, the full output is saved to a temp file. timeout is in seconds. " +
-			"background: true returns at once and the result arrives as a message when the command exits (in a sub-agent it is ignored; a command still running after 240 s returns its output so far, continue with `pi-bg-wait <id>`). " +
-			"monitor: true (main session) sends each stdout line as a message, batched about 1 s, until timeout (default 300 s, max 3600 s), or with persistent: true until `pi-bg-stop <id>` or the session ends. " +
+			"The output stays in your context for the rest of the session: filter at the source (grep, head, tail, jq, wc, quiet flags) and send long output to a file you then search.\n" +
+			"Not for changing an existing file: `sed -i`, a heredoc or a script rewrite skips the diagnostics that edit and write run, and fails silently when nothing matches. Generated files, formatter or codemod runs and scratch files under /tmp are fine. " +
+			"GitHub goes through the logged-in `gh` CLI (`gh pr`, `gh run`, `gh api`, with `--json` and `-q` to filter), not curl or a web tool: it is authenticated, sees private repos and returns structured data.\n" +
+			"background: true is for waiting on something slow (CI, a long build, a deploy): run one command that exits when the thing is done (`gh run watch <id> --exit-status`, `until grep -q Ready app.log; do sleep 2; done`) instead of a sleep-and-check loop. It returns at once and you are woken with the output when the command exits (in a sub-agent it is ignored; a command still running after 240 s returns its output so far, continue with `pi-bg-wait <id>`).\n" +
+			"monitor: true (main session) is for reacting to a stream of events (new review comments, CI state changes, errors in a log): each stdout line wakes you, batched about 1 s, until timeout (default 300 s, max 3600 s), or with persistent: true until `pi-bg-stop <id>` or the session ends. Print only lines you would act on, failures included, and make the output line-buffered (grep --line-buffered, stdbuf -oL, python -u); more than 120 lines a minute stops the monitor.\n" +
 			"`pi-bg-stop <id>` stops a background command, watch or loop without a message.",
+	},
+	write: {
+		description:
+			"Write a whole file: a new file or a complete rewrite. A change to part of a file goes through edit. Creates parent directories and overwrites an existing file. Diagnostics for the file come back with the result.",
 	},
 	edit: {
 		description:
-			"Edit one file by exact text replacement. Each edits[].oldText must match one unique region of the original file (edits are not applied one after another) and must not overlap another. Several changes to one file go in one call; merge nearby changes into one edit and keep oldText short.",
+			"Edit one file by exact text replacement. Read the lines you will change with read first (offset/limit is enough): an edit to unread lines is refused. Each edits[].oldText must match one unique region of the original file (edits are not applied one after another) and must not overlap another. Several changes to one file go in one call; merge nearby changes into one edit and keep oldText short. Diagnostics for the file come back with the result.",
 		params: { edits: "Replacements, each {oldText, newText}, all matched against the original file." },
 	},
 	schedule_wakeup: {
@@ -130,7 +141,13 @@ const TRIMS: Record<string, Trim> = {
 	},
 	advisor: {
 		// "a stronger reviewer model" until 2026-11-21: false in a Fable session, where the advisor (Opus 5.5) is the smaller model
-		description: "Ask a second model for guidance, then continue. It reads your whole conversation with a fresh view and answers with one recommendation; no parameters.",
+		// when-to-use moved here from advisor.json's promptGuidelines (2026-11-21), same content. One guideline stays there
+		// (repeat the advice in the reply): it is about the reply, and an empty list makes the package fall back to its
+		// own seven lines ("Call `advisor` BEFORE substantive work").
+		description:
+			"Ask a second model for guidance, then continue. It reads your whole conversation with a fresh view and answers with one recommendation; no parameters. " +
+			"Worth a call when you are stuck (recurring errors, no convergence), before a hard-to-reverse decision (architecture, contract change, deleting code you did not write), when two readings of the task lead to different work, and once on a long task before declaring done, after the deliverable is saved. Not for a routine step whose next action follows from the last tool output. " +
+			"Its advice is an opinion: primary evidence (the file says X, the command printed Y) outranks it, and a disagreement goes back to it in one more call.",
 	},
 	subagent: {
 		rewrite: subagentRewrite,
@@ -192,15 +209,15 @@ const TOOLS_SECTION =
 // (resource-loader.js extendResources), so they are dropped here instead. They pushed
 // ast-grep and LSP over the tools the prompt names; `/skill:<name>` still works.
 const HIDDEN_SKILL = /\n[ \t]*<skill>\s*<name>pi-lens-[^<]*<\/name>[\s\S]*?<\/skill>/g;
-// pi's built-in guideline lines, matched exactly. "" drops the line. The edit lines repeat the
-// edit tool description; "use read instead of cat or sed" contradicted the append's
-// "filter with grep/head/tail" (ignored in 2078 bash calls a week), while the rule that matters
-// is pi-lens's read-before-edit guard (10 refused edits a week). The last two come from the
+// pi's built-in guideline lines, matched exactly. "" drops the line. The edit and write lines repeat the
+// tool descriptions above; "use read instead of cat or sed" contradicted "filter with grep/head/tail"
+// (ignored in 2078 bash calls a week), and the rule that matters, pi-lens's read-before-edit guard
+// (10 refused edits a week), is in the edit description since 2026-11-21. The last two come from the
 // pi-permission-system patch and repeat the append's style rules.
 const GUIDELINES: Record<string, string> = {
 	"- Use bash for file operations like ls, rg, find": "",
-	"- Use read to examine files instead of cat or sed.":
-		"- Read the part of a file you will change with `read` first (offset/limit is enough); an edit to unread lines is refused. For a quick look, grep, head or sed -n in bash are fine.",
+	"- Use read to examine files instead of cat or sed.": "",
+	"- Use write only for new files or complete rewrites.": "",
 	"- Use edit for precise changes (edits[].oldText must match exactly)": "",
 	"- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls": "",
 	"- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.": "",

@@ -51,4 +51,10 @@ assert.ok(sub.description.includes("- Explore: finds code\n- reviewer: reviews\n
 for (const part of ["sees none of this conversation", "Not worth it for one known file", "Brief it as you would"]) assert.ok(sub.description.includes(part), part);
 assert.ok(!sub.description.includes("More host text") && !("model" in sub.input_schema.properties));
 assert.equal(mod.trimTool({ name: "subagent", description: "No list here.", input_schema: { type: "object", properties: {} } }).description, "No list here.");
-console.log("tool-trim: all payload shapes trimmed, hidden params dropped, 1.5 tools section dropped, subagent description (18 checks)");
+// 2026-11-21: when-to-use text lives in the descriptions, and the guideline lines that said the same are dropped
+const desc = (name) => mod.trimTool({ name, description: "host text", input_schema: { type: "object", properties: {} } }).description;
+assert.ok(desc("bash").includes("Not for changing an existing file") && desc("bash").includes("background: true is for waiting") && desc("bash").includes("`gh` CLI"));
+assert.ok(desc("edit").includes("an edit to unread lines is refused") && desc("write").includes("A change to part of a file goes through edit"));
+assert.ok(desc("advisor").includes("Worth a call when you are stuck") && desc("advisor").includes("Its advice is an opinion"));
+assert.equal(mod.trimSystemText("P\n\n<rules>\n- Use read to examine files instead of cat or sed.\n- Use write only for new files or complete rewrites.\n- You can inspect PI_* environment variables\n</rules>"), "P\n\n<rules>\n- You can inspect PI_* environment variables\n</rules>");
+console.log("tool-trim: all payload shapes trimmed, hidden params dropped, 1.5 tools section dropped, subagent and when-to-use descriptions (22 checks)");
