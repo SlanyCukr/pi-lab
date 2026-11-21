@@ -3,6 +3,7 @@
 # usage: replay.sh <model> <thinking> <cases-file> [out-dir]
 #   replay.sh anthropic/claude-opus-5-5 high cases.txt     # the baseline arm: the same model again
 #   replay.sh openai/gpt-6.2-sol high cases.txt            # the candidate
+#   replay.sh google/gemini-4-neon high cases.txt         # another candidate (needs GEMINI_API_KEY, paid tier)
 # cases-file: one reviewed head sha per line (`#` comments), from pick-cases.py. For each head the script takes the
 # base from the loop's verdict file, the original prompt from the review session, and runs the reviewer agent
 # (~/.pi/agent/agents/reviewer.md: tools and prompt; model and thinking from the arguments) in a checkout of that
