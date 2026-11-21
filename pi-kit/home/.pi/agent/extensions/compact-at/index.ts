@@ -44,7 +44,7 @@ const INSTRUCTIONS = [
 ].join(" ");
 
 const CONTINUE =
-	"Context was compacted automatically to keep the session small. The task is not finished: continue from the summary without asking. If a todo list exists, run `todo list` first to see what is done and what is left.";
+	"Context was compacted automatically to keep the session small. The task is not finished: continue from the summary without asking.";
 
 export default function (pi: ExtensionAPI) {
 	let isChild = false;
