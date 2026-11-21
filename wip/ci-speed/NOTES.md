@@ -49,3 +49,25 @@ at the median) and asked to discuss before doing anything like it. Nothing here 
    by side. The first risks "letting CI lie" unless CI can prove the tree is the one that was tested; the second
    competes with production for 4 cores.
 3. **Test pruning on evidence**, as in the prompt. No cost; two weeks of logging first.
+
+## Can the tests themselves be faster? (measured the same day from the CI log of run 44917668112)
+
+Yes. The first version of these notes only showed where the time goes.
+
+- **Frontend unit tests (vitest), 125 s.** Vitest's own summary: environment 42 %, import 33 %, tests 13 %,
+  transform 6 %, worker 4 %, setup 2 %. Running the 1,338 tests takes about 16 s; the rest is building a browser-like
+  environment and importing modules again for each of 243 files. This is what the prompt's "isolate modules, not
+  processes" is about.
+- **Backend tests (pytest), 454 s for 6,012 tests on 4 workers.** 34 s pass before the first test. The time is very
+  uneven: 50 % of the tests are done at 253 s, the next 25 % take 9 s, and the last 5 % take 116 s, with silences of
+  30 s and 48 s near the end. A small slow group decides the total. Which tests they are is not recorded: pytest
+  runs without `--durations`.
+- **Pyright, 67 s**, runs after the tests, and `ty` (1 s) already type-checks the same code.
+
+## What failed in CI (120 pushes, 2026-11-15 to 11-21): 10 red jobs
+
+npm audit 3, database contract tests 3, frontend unit tests 2, frontend type check 1, browser specs 1, pytest 0.
+The 6,012 backend tests did not fail once in CI. That is not proof they are useless: the loop runs them before
+every push, and those local failures are not logged per test. Half of the backend tests take about 2 % of the
+time, so deleting tests by count shortens CI little; deleting or fixing the slow ones does.
+
