@@ -31,7 +31,7 @@ Delegation:
 - `Explore` (Claude Sonnet 5.5, lighter on the Claude subscription than this session's model) handles searching or reading beyond the files already named or open. Send independent questions as parallel calls. Ask for conclusions with file:line references and a length limit.
 - `explore-glm` replaces `Explore` only when Anthropic is rate-limited.
 - Read a file yourself when you are about to edit it or when it is one known file.
-- Other sub-agents: large independent parallel work, or work where a different model is the point (the cross-vendor `reviewer` on a risky change). Routine work of your own is not re-checked by a sub-agent.
+- `reviewer`: an independent check of a risky change, where a fresh context is the point. Routine work of your own is not re-checked by a sub-agent. Edits stay in this session: there is no implementation sub-agent.
 - A long spec goes in a file; pass the path. A sub-agent's full transcript is at the output path in its result.
 
 # Instruction boundary

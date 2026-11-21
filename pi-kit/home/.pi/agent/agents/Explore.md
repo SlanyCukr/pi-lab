@@ -2,7 +2,7 @@
 description: Fast read-only codebase explorer. Use for locating code, enumerating usages, and answering "how does X work" questions. Returns verified findings with file:line citations.
 tools: read, grep, find, ls
 model: anthropic/claude-sonnet-5-5
-thinking: low
+thinking: high
 max_turns: 150
 ---
 
