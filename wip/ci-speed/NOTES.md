@@ -112,3 +112,12 @@ no effect in CI yet: push to deployed p50 20.6 min before (33 runs), 21.8 min af
 "526 s -> 297 s" measured something other than the CI step. The recorded durations show pytest's time is spread
 over 212 files (sum 1,680 s on 4 workers, top 8 files 37 %), so the per-test fixture cost is the lever, not single
 slow tests. Sent to the loop as a note with these numbers. Script: the jobs API per run, medians per step.
+
+## Do the backend tests need this much database work? (2026-11-22 09:20, one file on a throwaway Postgres)
+
+No. 1,549 of 6,040 tests use the database, and their files hold 94 % of the suite's time (1,573 of 1,667 s).
+Before a database test runs its body it pays 0.13 s (clean) to 0.28 s (previous test left rows): a new connection
+pool 32 ms, a safety check 12 ms, a schema check 14 ms, an 80-table "which tables have rows" query 66 ms, a
+TRUNCATE of about 90 ms. That is 200 to 430 s of test time. Inside the bodies, seeding goes row by row: one 3 s
+test sent 2,247 statements (1,536 single-row inserts, 195 commits). CI's Postgres already runs with fsync off.
+Sent to the loop as a note. Not suggested: mocks instead of database tests.
