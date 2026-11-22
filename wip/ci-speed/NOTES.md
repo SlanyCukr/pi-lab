@@ -103,3 +103,12 @@ instead of `/home/pi` for its venv and build cache. Not sent to the loop.
 Removed on 2026-11-22 (the user: not enough memory there): the GitHub runner, its user and podman. A second
 machine for the check jobs needs about 4 GB free, which neither spare Pi has; what is left is speeding up the tests
 on the production Pi (the loop's project) or rented runners.
+
+## First check of the loop's project (2026-11-22 08:30)
+
+Part 1 (record) is done: CI keeps JUnit XML per run, `tools/test-history.py` reads it. Part 2 has two commits and
+no effect in CI yet: push to deployed p50 20.6 min before (33 runs), 21.8 min after (12 runs); quality job 12.8 to
+13.2 min; pytest step 489 to 487 s; frontend unit step 136 to 122 s; pyright 76 to 88 s. The commit that says
+"526 s -> 297 s" measured something other than the CI step. The recorded durations show pytest's time is spread
+over 212 files (sum 1,680 s on 4 workers, top 8 files 37 %), so the per-test fixture cost is the lever, not single
+slow tests. Sent to the loop as a note with these numbers. Script: the jobs API per run, medians per step.
