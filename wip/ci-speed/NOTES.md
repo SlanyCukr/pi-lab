@@ -98,5 +98,8 @@ came back clean. The mistake was mine: I planned to measure memory on the first 
 
 Expected gain if it ran: the two check jobs side by side, about 6 minutes off each deploy (20.6 to about 15 min at
 the median, estimate). The workflow change it needs is small: a `runs-on` label for the contract job, and `$HOME`
-instead of `/home/pi` for its venv and build cache. Not sent to the loop; the runner is off until the user decides
-whether that host gets the memory.
+instead of `/home/pi` for its venv and build cache. Not sent to the loop.
+
+Removed on 2026-11-22 (the user: not enough memory there): the GitHub runner, its user and podman. A second
+machine for the check jobs needs about 4 GB free, which neither spare Pi has; what is left is speeding up the tests
+on the production Pi (the loop's project) or rented runners.
