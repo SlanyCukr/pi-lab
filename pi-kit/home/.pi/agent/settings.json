@@ -25,6 +25,7 @@
     "maxRetries": 8,
     "baseDelayMs": 3000
   },
+  "cacheWarming": "streaming",
   "theme": "dark",
   "defaultProjectTrust": "always"
 }
