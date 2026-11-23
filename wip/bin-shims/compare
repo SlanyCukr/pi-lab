@@ -1,0 +1,4 @@
+#!/bin/sh
+# ImageMagick 7 is one binary (~/bin/magick); `compare` is its subcommand. Loop sessions called the bare name: 17 identify and 2 compare
+# "command not found" results from 11-09 to 11-23 (harness review 2026-11-23). Rollback: rm this file.
+exec "$HOME/bin/magick" compare "$@"
