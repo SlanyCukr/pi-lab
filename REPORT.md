@@ -2,7 +2,7 @@
 
 Log of the user's pi setup: what is installed, why, and what was tried.
 
-## Current setup (as of 2026-11-23, pi 1.6.0)
+## Current setup (as of 2026-11-24, pi 1.6.0)
 
 This section is the source of truth; the sections below explain how it got here.
 
@@ -36,7 +36,7 @@ Own extensions in `~/.pi/agent/extensions/` (dev copies in `~/pi-lab/wip/`):
 - `pi-permission-system/config.json`: allow by default, `yoloMode: true`, deny dotenv files, `~/.ssh`, the pi and Codex credential files, `rm -rf` outside `/tmp`.
 
 Other config: `~/.pi/agent/APPEND_SYSTEM.md` (ADHD style, lean since 2026-09-24; dev copy `wip/token-audit/APPEND_SYSTEM.lean.md`), `~/.pi/agent/agents/*.md` (`general-purpose`/`Plan` off via `enabled: false`), `~/.agents/skills/` (diagnose, grill-me, desloppify, find-gaps; the rest in `~/.agents/skills.disabled/`),
-`~/.pi-lens/config.json` (trimmed tools, hidden widget; `contextInjection.retain` since 2026-11-10, so a finding no longer breaks the prompt cache), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16), `~/.pi/agent/models.json` (adds `anthropic/claude-fable-5-2`, 2026-11-09: released that day, upstream pi commit `0d1793c2` not in 1.5.0; same settings as Fable 5.1, $8/$40).
+`~/.pi-lens/config.json` (trimmed tools, hidden widget; `contextInjection.retain` since 2026-11-10, so a finding no longer breaks the prompt cache), `.pi-lens.json` in `~/pi-lab` and `~/Documents/personal/projects` (style-only rules off, `backup-*` ignored; copy `wip/token-audit/pi-lens.shared.json`), `~/.config/rpiv-todo/config.json`, `~/.pi/agent/web-search.json` (`source_check`, `get_search_content` off; `webSearch.allowedProviders: [openai, exa]`), prompt template `~/.pi/agent/prompts/deeper.md` (`/deeper <task>`, 2026-10-16), `~/.pi/agent/models.json` (adds `anthropic/claude-fable-5-2`, 2026-11-09: released that day, upstream pi commit `0d1793c2` not in 1.5.0; same settings as Fable 5.1, $8/$40; and `zai/glm-5.4`, 2026-11-24: z.ai serves it, pi 1.6.0 lists up to 5.3; no agent uses it).
 
 Public repo: `~/pi-lab` is `github.com/SlanyCukr/pi-lab` (since 2026-10-05; no loop, no session data). Portable copy `pi-kit/`: `export.sh` snapshots this setup, `install.sh --sub copilot|codex|openai` installs it, `server/` installs a headless host, `box/` has a Docker image and a credential-free test. See its README and "Decisions: portable kit".
 
@@ -241,6 +241,7 @@ find-gaps details: `wip/find-gaps/DESIGN.md`. Daily harness review details: `rev
 - 2026-11-21 — Research: testing and CI when agents write the code, Anthropic's guidance and independent sources against media_monitoring (`wip/ci-speed/RESEARCH.md`); the CI and test project went to the loop at 18:45 (record per-test results, speed, prune by mutation testing, property tests; baseline push-to-deployed p50 20.6 min). The first build cycle on the split skill (806) read neither `DISCOVER.md` nor `OPERATE.md`. Stale todo-tool sentences removed (the tool left on 11-11): `compact-at`'s continue message (old tail: "If a todo list exists, run `todo list` first to see what is done and what is left."), `OPERATE.md` start step 3, the step-mode END output in `run.sh`.
 - 2026-11-21 — A runner for the check jobs on the user's second Pi 5 (own user, no sudo, rootless podman behind the docker CLI, label `mm-checks`): set up, tested, switched off. The first job hung that host in its build step and the watchdog reset it; no memory cap had been set first. Nothing on main uses the label (`wip/ci-speed/NOTES.md`).
 - 2026-11-22 — The check-job runner on the user's second Pi 5 is removed (GitHub runner, its user, podman): too little free memory there. On that host, two units that failed at every boot now start (they called a `docker-compose` binary that does not exist).
+- 2026-11-24 — Harness review: `account-usage.py` (Anthropic use flat at ~29.5 M output tokens per 7 days; the limit hit 3 times at that sum); tool times from `durationMs`; GLM-5.4 lens trial not adopted (2 runs: no report in 30 min, 30 % of z.ai's 5-hour quota). `reviews/2026-11-24.md`
 - 2026-11-23 — Harness review: the runner writes `known.md` (one line per finding, newest first) for the lenses' known check; their `done.md` greps were 19 % of what they read, 51 of 233 cut in its oldest part. `reviews/2026-11-23.md`.
 - 2026-11-20 — Harness review: the loop's cycle gets the whole ledger in its prompt, sent on stdin (no cut or sliced reads; the 48 KB ceiling, unreachable with 13 owner items = 13.4 KB, is gone); `analyze-loop.py` prints ledger size and re-reads. `reviews/2026-11-20.md`
 - 2026-11-19 — Harness review: the loop's ledger fits one read again (trim point capped at 48 KB, rows waiting for the owner parked: 62.3 → 44.1 KB in c716); `analyze-loop.py` counts cut ledger reads and pre-review flakes. `reviews/2026-11-19.md`
